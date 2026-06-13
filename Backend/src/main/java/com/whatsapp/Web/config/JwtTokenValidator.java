@@ -5,11 +5,12 @@ import java.util.List;
 
 import javax.crypto.SecretKey;
 
-import com.whatsapp.Web.config.JwtConstant;
+import com.whatsapp.Web.config.JwtConfig;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,6 +26,9 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class JwtTokenValidator extends OncePerRequestFilter {
 
+    @Autowired
+    private JwtConfig jwtConfig;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -36,8 +40,8 @@ public class JwtTokenValidator extends OncePerRequestFilter {
                 // Remove "Bearer " prefix
                 jwt = jwt.substring(7);
 
-                // Create secret key for JWT parsing
-                SecretKey key = Keys.hmacShaKeyFor(JwtConstant.SECRET_KEY.getBytes());
+                // Create secret key for JWT parsing using JwtConfig
+                SecretKey key = Keys.hmacShaKeyFor(jwtConfig.getSecretKey().getBytes());
 
                 // Parse the claims from the JWT
                 Claims claims = Jwts.parserBuilder()
