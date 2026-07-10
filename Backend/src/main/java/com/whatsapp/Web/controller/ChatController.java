@@ -65,7 +65,6 @@ public class ChatController {
 
         User reqUser=userService.findUserByProfile(jwt);
         List<Chat> chats=chatService.findAllChatByUserId(reqUser.getId());
-        System.out.println(chats);
         return new ResponseEntity<List<Chat>>(chats,HttpStatus.OK);
 
 

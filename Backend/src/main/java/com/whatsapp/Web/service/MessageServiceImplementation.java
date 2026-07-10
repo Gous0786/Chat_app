@@ -26,8 +26,18 @@ public class MessageServiceImplementation implements MessageService {
         this.chatService = chatService;
         this.userService = userService;
     }
+    private static final int MAX_MESSAGE_LENGTH = 5000;
+
     @Override
-    public Message sendMessage(SendMessageRequest req) throws UserException, ChatException {
+    public Message sendMessage(SendMessageRequest req) throws UserException, ChatException, MessageException {
+        String content = req.getContent();
+        if (content == null || content.trim().isEmpty()) {
+            throw new MessageException("Message content cannot be empty");
+        }
+        if (content.length() > MAX_MESSAGE_LENGTH) {
+            throw new MessageException("Message exceeds maximum length of " + MAX_MESSAGE_LENGTH + " characters");
+        }
+
         User user = userService.findUserById(req.getUserId());
         Chat chat = chatService.findChatById(req.getChatId());
 
@@ -71,10 +81,8 @@ public class MessageServiceImplementation implements MessageService {
 
         if(message.getUser().getId().equals(reqUser.getId())) {
             messageRepository.deleteById(messageId);
+        } else {
+            throw new UserException("You can't delete another users' message "+reqUser.getFull_name());
         }
-        throw new UserException("You can't delete another users' message "+reqUser.getFull_name());
-
-
-
     }
 }

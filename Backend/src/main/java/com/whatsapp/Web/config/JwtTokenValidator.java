@@ -1,4 +1,4 @@
-package com.Whatsapp.config;
+package com.whatsapp.Web.config;
 
 import java.io.IOException;
 import java.util.List;

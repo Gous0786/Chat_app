@@ -4,7 +4,6 @@ import com.whatsapp.Web.model.Message;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
@@ -13,18 +12,10 @@ public class RealtimeChat {
     @Autowired
     private SimpMessagingTemplate simpMessagingTemplate;
 
-
+    // Deliver only to the specific chat's topic. No global broadcast:
+    // a @SendTo("/group/public") here would leak every message to any subscriber.
     @MessageMapping("/message")
-    @SendTo("/group/public")
-    public Message receiveMessage(@Payload Message message) {
-        // Send the message to the specific chat group
-        if (simpMessagingTemplate == null) {
-                    throw new IllegalStateException("SimpMessagingTemplate is not initialized");
-               }
+    public void receiveMessage(@Payload Message message) {
         simpMessagingTemplate.convertAndSend("/group/" + message.getChat().getId(), message);
-
-        System.out.println("websocket kaam kr rha h");
-        // Return the message or a success response
-        return message;  // You can modify this if you want to return a different response
     }
 }

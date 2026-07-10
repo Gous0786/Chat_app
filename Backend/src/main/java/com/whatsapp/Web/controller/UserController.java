@@ -38,7 +38,6 @@ public class UserController {
             @PathVariable Long id,  // Capture the ID from the URL
             @RequestBody UpdateUserRequest req,
             @RequestHeader("Authorization") String token) throws UserException {
-        System.out.println("Received update request for user ID: " + id + ", data: " + req);
 
         // You might want to validate the user token and ensure the user is authorized to update this profile.
         User user = userService.findUserByProfile(token);

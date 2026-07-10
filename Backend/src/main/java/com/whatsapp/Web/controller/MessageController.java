@@ -28,15 +28,13 @@ public class MessageController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<Message> sendMessageHandler(@RequestBody SendMessageRequest req, @RequestHeader("Authorization") String jwt) throws UserException, ChatException {
+    public ResponseEntity<Message> sendMessageHandler(@RequestBody SendMessageRequest req, @RequestHeader("Authorization") String jwt) throws UserException, ChatException, MessageException {
 
         User user=userService.findUserByProfile(jwt);
 
         req.setUserId(user.getId());
 
-
         Message message = messageService.sendMessage(req);
-       System.out.println("Hit ho gya bkl");
         return new ResponseEntity<Message>(message, HttpStatus.OK);
 
     }

@@ -1,5 +1,6 @@
 package com.whatsapp.Web.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 import java.util.Objects;
@@ -15,6 +16,9 @@ public class User {
     private String full_name;
     private String email;
     private String profile_picture;
+
+    // Accept password on write (signup/login) but never serialize the hash back to clients.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     public User() {
