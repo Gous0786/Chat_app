@@ -20,11 +20,11 @@ import java.util.Collections;
 public class AppConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtConfig jwtConfig) throws Exception {
 
         http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and().authorizeRequests(authorize -> authorize.requestMatchers("/api/**").authenticated()
-                ).addFilterBefore(new JwtTokenValidator(), BasicAuthenticationFilter.class)
+                ).addFilterBefore(new JwtTokenValidator(jwtConfig), BasicAuthenticationFilter.class)
                 .csrf().disable()
                 .cors().configurationSource(new CorsConfigurationSource() {
                     @Override
