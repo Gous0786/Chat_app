@@ -1,0 +1,11 @@
+# Environment files with secrets (commit .env.example instead)
+.env
+.env.local
+*/.env
+*/.env.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
