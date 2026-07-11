@@ -1,4 +1,8 @@
 import './index.css';
+// Self-hosted variable fonts (no CDN): Playfair display, DM Sans UI, JetBrains mono
+import '@fontsource-variable/playfair-display';
+import '@fontsource-variable/dm-sans';
+import '@fontsource-variable/jetbrains-mono';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';  // Add this import
@@ -6,13 +10,18 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter } from 'react-router-dom';
 import { store } from './Redux/store';
+import { ToastProvider } from './Components/ui/Toast';
+import { LiquidGlassDefs } from './Components/ui/LiquidGlass';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <BrowserRouter> 
-      <Provider store={store}>  
-        <App />
+    <BrowserRouter>
+      <Provider store={store}>
+        <ToastProvider>
+          <LiquidGlassDefs />
+          <App />
+        </ToastProvider>
       </Provider>
     </BrowserRouter>
   </React.StrictMode>
