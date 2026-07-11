@@ -7,10 +7,19 @@ public class SendMessageRequest {
     private Integer userId;
     private Integer chatId;
     private String content;
+    private boolean encrypted;
 
     public SendMessageRequest()
     {
 
+    }
+
+    public boolean isEncrypted() {
+        return encrypted;
+    }
+
+    public void setEncrypted(boolean encrypted) {
+        this.encrypted = encrypted;
     }
     public Integer getUserId() {
         return userId;

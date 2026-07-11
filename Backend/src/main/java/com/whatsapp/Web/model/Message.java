@@ -9,7 +9,13 @@ public class Message {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Integer id;
+
+    // TEXT so it can hold base64 Signal ciphertext (far longer than 255 chars).
+    @Column(columnDefinition = "TEXT")
     private String content;
+
+    // true = Signal ciphertext (E2E DM), false = legacy plaintext / group.
+    private boolean encrypted = false;
 
     private LocalDateTime timestamp;
 
@@ -38,6 +44,14 @@ public class Message {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public boolean isEncrypted() {
+        return encrypted;
+    }
+
+    public void setEncrypted(boolean encrypted) {
+        this.encrypted = encrypted;
     }
 
     public LocalDateTime getTimestamp() {

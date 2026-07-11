@@ -26,7 +26,8 @@ public class MessageServiceImplementation implements MessageService {
         this.chatService = chatService;
         this.userService = userService;
     }
-    private static final int MAX_MESSAGE_LENGTH = 5000;
+    // Generous cap: base64 Signal ciphertext is ~33% larger than plaintext plus envelope overhead.
+    private static final int MAX_MESSAGE_LENGTH = 20000;
 
     @Override
     public Message sendMessage(SendMessageRequest req) throws UserException, ChatException, MessageException {
@@ -45,6 +46,7 @@ public class MessageServiceImplementation implements MessageService {
         message.setChat(chat);
         message.setUser(user);
         message.setContent(req.getContent());
+        message.setEncrypted(req.isEncrypted());
         message.setTimestamp(LocalDateTime.now());
 
         // Save the message to the repository
