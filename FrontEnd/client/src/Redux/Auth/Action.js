@@ -1,5 +1,6 @@
 import { BASE_API_URL } from "../../config/api";
 import { LOGIN, LOGOUT, REGISTER, REQ_USER, SEARCH_USER, UPDATE_USER } from "./ActionType";
+import { initSignalIdentity, replenishPreKeys } from "../../signal/keys";
 
 export const register=(data)=>async(dispatch)=>{
     try{
@@ -62,6 +63,18 @@ export const currentUser = (token) => async (dispatch) => {
         const resData = await res.json();
         console.log("current user ", resData);
         dispatch({ type: REQ_USER, payload: resData });
+
+        // Ensure this device has a Signal identity + the server has our bundle
+        // (idempotent — skips generation if keys already exist), then top up
+        // the one-time prekey pool if it's running low.
+        if (resData && resData.id) {
+            try {
+                await initSignalIdentity(token);
+                await replenishPreKeys(token);
+            } catch (e) {
+                console.error("Signal identity init failed:", e);
+            }
+        }
     } catch (error) {
         console.log("Fetching current user error:", error);
     }

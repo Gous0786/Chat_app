@@ -28,6 +28,7 @@ import {
   DropdownMenuItem,
 } from './ui/DropdownMenu';
 import { motion } from 'framer-motion';
+import { ensureSession } from '../signal/session';
 
 const HomePage = () => {
   const [querys, setQuerys] = useState('');
@@ -183,6 +184,24 @@ const connect = () => {
   const handleCurrentChat=(item)=>{
     setCurrentChat(item)
   }
+
+  // The other participant in a 1:1 chat (null for groups / not-ready state).
+  const getPeerUserId = (chatItem) => {
+    if (!chatItem || chatItem.group === true || !chatItem.users) return null;
+    const other = chatItem.users.find((u) => u.id !== auth.reqUser?.id);
+    return other?.id ?? null;
+  };
+
+  // Establish a Signal session with the peer when a 1:1 chat is opened.
+  useEffect(() => {
+    const peerId = getPeerUserId(currentChat);
+    if (peerId && token) {
+      ensureSession(peerId, token).catch((e) =>
+        console.error("ensureSession failed:", e)
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentChat, token]);
 
   
 
