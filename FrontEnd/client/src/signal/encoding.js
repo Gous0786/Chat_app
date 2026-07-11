@@ -1,0 +1,28 @@
+// Base64 <-> ArrayBuffer helpers. Signal key material and ciphertext are binary
+// (ArrayBuffer); the network (JSON) and DB (TEXT) are text, so we base64 everything.
+
+export function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+export function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+export function stringToArrayBuffer(str) {
+  return new TextEncoder().encode(str).buffer;
+}
+
+export function arrayBufferToString(buffer) {
+  return new TextDecoder().decode(buffer);
+}
