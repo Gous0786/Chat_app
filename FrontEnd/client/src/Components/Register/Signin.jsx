@@ -1,28 +1,32 @@
-import { Alert, Button, Snackbar } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { login } from '../../Redux/Auth/Action';
+import LiquidGlass from '../ui/LiquidGlass';
+import Input from '../ui/Input';
+import Button from '../ui/Button';
+import { useToast } from '../ui/Toast';
 
 const Signin = () => {
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [openErrorSnackbar, setOpenErrorSnackbar] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [inputData, setInputData] = useState({ email: '', password: '' });
   const dispatch = useDispatch();
   const token = localStorage.getItem('jwt');
   const auth = useSelector((store) => store.auth);
+  const toast = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorMessage(''); // Reset error message
+    setLoading(true);
     try {
       await dispatch(login(inputData));
-      setOpenSnackbar(true);
+      toast.success('Login successful!');
     } catch (error) {
-      setOpenErrorSnackbar(true);
-      setErrorMessage('Login failed. Please check your credentials.');
+      toast.error('Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,95 +35,81 @@ const Signin = () => {
     setInputData((values) => ({ ...values, [name]: value }));
   };
 
-  const handleSnackbarClose = () => {
-    setOpenSnackbar(false);
-  };
-
-  const handleErrorSnackbarClose = () => {
-    setOpenErrorSnackbar(false);
-  };
-
   useEffect(() => {
     if (token || (auth.reqUser && auth.reqUser.full_name)) {
-      console.log('Component mounted  1');
-        navigate('/');
+      navigate('/');
     }
-}, [token, auth.reqUser?.full_name, navigate]); // Check for necessary dependencies only
-
+  }, [token, auth.reqUser?.full_name, navigate]); // Check for necessary dependencies only
 
   return (
-    <div>
-      <div className="flex justify-center h-screen items-center bg-gradient-to-r from-blue-500 to-purple-600 p-8">
-        <div className="w-[30%] p-10 bg-white/20 backdrop-blur-lg rounded-lg shadow-lg">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {errorMessage && <p className="text-red-600">{errorMessage}</p>}
-            <div>
-              <p className="mv-2">Email</p>
-              <input
-                type="text"
-                className="py-2 outline outline-white w-full rounded-md border"
-                placeholder="Enter your email"
-                onChange={handleChange}
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
+      {/* ambient gold wash */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(900px 500px at 20% 10%, rgba(228,197,144,0.10), transparent 55%), radial-gradient(700px 600px at 90% 95%, rgba(255,255,255,0.03), transparent 60%)',
+        }}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full max-w-[420px]"
+      >
+        <div className="mb-8 text-center">
+          <h1 className="font-display text-5xl text-ink">Aura</h1>
+          <p className="mt-2 font-sans text-sm text-ink-muted">
+            Welcome back. Sign in to continue.
+          </p>
+        </div>
+
+        <LiquidGlass className="rounded-2xl p-8">
+          <form onSubmit={handleSubmit} className="relative space-y-5">
+            <div className="space-y-2">
+              <label htmlFor="email" className="font-sans text-sm text-ink-muted">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
                 name="email"
+                placeholder="you@example.com"
+                onChange={handleChange}
                 value={inputData.email}
               />
             </div>
 
-            <div>
-              <p className="mv-2">Password</p>
-              <input
+            <div className="space-y-2">
+              <label htmlFor="password" className="font-sans text-sm text-ink-muted">
+                Password
+              </label>
+              <Input
+                id="password"
                 type="password"
-                className="py-2 outline outline-white w-full rounded-md border"
-                placeholder="Enter your password"
-                onChange={handleChange}
                 name="password"
+                placeholder="••••••••"
+                onChange={handleChange}
                 value={inputData.password}
               />
             </div>
 
-            <div>
-              <Button variant="contained" type="submit" className="w-full">
-                Sign in
-              </Button>
-            </div>
-          </form>
-          <div className="flex space-x-3 items-center mt-5">
-            <p className="m-0">Create New Account</p>
-            <Button variant="contained" onClick={() => navigate('/signup')}>
-              Signup
+            <Button type="submit" size="lg" className="w-full" disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign in'}
             </Button>
-          </div>
+          </form>
+        </LiquidGlass>
+
+        <div className="mt-6 flex items-center justify-center gap-2 text-sm">
+          <span className="text-ink-muted">New here?</span>
+          <button
+            onClick={() => navigate('/signup')}
+            className="font-medium text-accent transition-opacity hover:opacity-80"
+          >
+            Create an account
+          </button>
         </div>
-      </div>
-
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-      >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity="success"
-          variant="filled"
-          sx={{
-            width: '100%',
-            bgcolor: 'blue.600',
-            color: 'white',
-          }}
-        >
-          Login successful!
-        </Alert>
-      </Snackbar>
-
-      <Snackbar
-        open={openErrorSnackbar}
-        autoHideDuration={6000}
-        onClose={handleErrorSnackbarClose}
-      >
-        <Alert onClose={handleErrorSnackbarClose} severity="error" variant="filled">
-          {errorMessage}
-        </Alert>
-      </Snackbar>
+      </motion.div>
     </div>
   );
 };

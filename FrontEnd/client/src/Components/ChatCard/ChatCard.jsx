@@ -1,26 +1,25 @@
 import React from 'react';
+import { cn } from '../../lib/utils';
+import Avatar from '../ui/Avatar';
+import Timestamp from '../ui/Timestamp';
 
-const ChatCard = ({ userImg,name }) => {
+const ChatCard = ({ userImg, name, lastMessage, time, selected }) => {
   return (
-    <div className='flex items-center justify-center py-2 group cursor-pointer'>
-      <div className='w-[20%]'>
-        <img
-          className='h-14 w-14 rounded-full'
-          src={userImg}
-          
-        />
-      </div>
-      <div className='pl-5 w-[80%]'>
-        <div className='flex justify-between items-center'>
-          <p className='text-lg'>{name}</p> {/* Fixed interpolation */}
-          <p className='text-sm'></p> {/* Fixed interpolation */}
+    <div
+      className={cn(
+        'flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition-colors',
+        selected ? 'bg-glass-strong' : 'hover:bg-glass'
+      )}
+    >
+      <Avatar src={userImg} name={name} size="md" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="truncate font-sans text-sm font-medium text-ink">{name}</p>
+          {time && <Timestamp value={time} className="shrink-0 text-ink-muted" />}
         </div>
-        <div className='flex justify-between items-center'>
-          
-          <div className='flex space-x-2 items-center'>
-           
-          </div>
-        </div>
+        {lastMessage && (
+          <p className="mt-0.5 truncate font-sans text-xs text-ink-muted">{lastMessage}</p>
+        )}
       </div>
     </div>
   );

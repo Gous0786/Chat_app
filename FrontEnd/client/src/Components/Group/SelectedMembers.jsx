@@ -1,18 +1,21 @@
 import React from 'react';
 import { AiOutlineClose } from 'react-icons/ai';
+import Avatar from '../ui/Avatar';
 
 const SelectedMembers = ({ handleRemoveMember, member }) => {
-    return (
-        <div className='flex items-center rounded-full bg-white/20 backdrop-blur-lg shadow-lg p-1 m-1'>
-            <img 
-                className='w-7 h-7 rounded-full' 
-                src={member.profile_picture}  // Dynamically using member's profile picture
-                alt=""
-            />
-            <p className='px-2'>{member.full_name}</p> {/* Accessing member's full_name */}
-            <AiOutlineClose onClick={handleRemoveMember} className='pr-1 cursor-pointer' />
-        </div>
-    );
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-line bg-glass py-1 pl-1 pr-2 backdrop-blur-md">
+      <Avatar size="xs" src={member.profile_picture} name={member.full_name} />
+      <span className="font-sans text-sm text-ink">{member.full_name}</span>
+      <button
+        onClick={handleRemoveMember}
+        className="grid h-5 w-5 place-items-center rounded-full text-ink-muted transition-colors hover:bg-glass-strong hover:text-ink"
+        title="Remove"
+      >
+        <AiOutlineClose className="text-xs" />
+      </button>
+    </div>
+  );
 };
 
 export default SelectedMembers;

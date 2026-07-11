@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { Button, Snackbar, Alert } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { motion } from 'framer-motion';
 import { currentUser, register } from '../../Redux/Auth/Action';
+import LiquidGlass from '../ui/LiquidGlass';
+import Input from '../ui/Input';
+import Button from '../ui/Button';
+import { useToast } from '../ui/Toast';
 
 const Signup = () => {
-  const [openSnackbar, setOpenSnackbar] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const [inputData, setInputData] = useState({ full_name: "", email: "", password: "" });
+  const [inputData, setInputData] = useState({ full_name: '', email: '', password: '' });
   const dispatch = useDispatch();
-  const token = localStorage.getItem("jwt");
+  const token = localStorage.getItem('jwt');
   const { auth } = useSelector((state) => state);
+  const toast = useToast();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -21,18 +25,17 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!inputData.full_name || !inputData.email || !inputData.password) {
-      console.log("All fields are required");
+      toast.error('All fields are required');
       return;
     }
-    
+
     setLoading(true);
     try {
       await dispatch(register(inputData));
-      setOpenSnackbar(true);
-      navigate("/");
+      toast.success('Your account was created!');
+      navigate('/');
     } catch (error) {
-      console.log("Registration failed:", error);
-      setOpenSnackbar(true); // Optionally show error message here
+      toast.error('Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -46,86 +49,92 @@ const Signup = () => {
 
   useEffect(() => {
     if (auth.reqUser?.full_name) {
-      navigate("/");
+      navigate('/');
     }
   }, [auth.reqUser]);
 
-  const handleSnackbarClose = () => {
-    setOpenSnackbar(false);
-  };
-
   return (
-    <div>
-      <div className='flex flex-col justify-center min-h-screen items-center bg-gradient-to-r from-blue-500 to-purple-600 p-8'>
-        <div className='w-[30%] p-10 bg-white/20 backdrop-blur-lg rounded-l-lg '>
-          <form onSubmit={handleSubmit} className='space-y-5'>
-            <div>
-              <label htmlFor="full_name" className='mb-2'>User Name</label>
-              <input
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(900px 500px at 20% 10%, rgba(228,197,144,0.10), transparent 55%), radial-gradient(700px 600px at 90% 95%, rgba(255,255,255,0.03), transparent 60%)',
+        }}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full max-w-[420px]"
+      >
+        <div className="mb-8 text-center">
+          <h1 className="font-display text-5xl text-ink">Aura</h1>
+          <p className="mt-2 font-sans text-sm text-ink-muted">
+            Create your account. It only takes a moment.
+          </p>
+        </div>
+
+        <LiquidGlass className="rounded-2xl p-8">
+          <form onSubmit={handleSubmit} className="relative space-y-5">
+            <div className="space-y-2">
+              <label htmlFor="full_name" className="font-sans text-sm text-ink-muted">
+                Name
+              </label>
+              <Input
                 id="full_name"
-                className='py-2 px-3 outline outline-white w-full rounded-md border-1'
                 type="text"
-                placeholder='Enter username'
                 name="full_name"
+                placeholder="Your name"
                 onChange={handleChange}
                 value={inputData.full_name}
               />
             </div>
 
-            <div>
-              <label htmlFor="email" className='mb-2'>Email</label>
-              <input
+            <div className="space-y-2">
+              <label htmlFor="email" className="font-sans text-sm text-ink-muted">
+                Email
+              </label>
+              <Input
                 id="email"
-                className='py-2 px-3 outline outline-white w-full rounded-md border-1'
                 type="email"
-                placeholder='Enter email'
                 name="email"
+                placeholder="you@example.com"
                 onChange={handleChange}
                 value={inputData.email}
               />
             </div>
 
-            <div>
-              <label htmlFor="password" className='mb-2'>Password</label>
-              <input
+            <div className="space-y-2">
+              <label htmlFor="password" className="font-sans text-sm text-ink-muted">
+                Password
+              </label>
+              <Input
                 id="password"
-                className='py-2 px-3 outline outline-white w-full rounded-md border-1'
                 type="password"
-                placeholder='Enter password'
                 name="password"
+                placeholder="••••••••"
                 onChange={handleChange}
                 value={inputData.password}
               />
             </div>
 
-            <div>
-              <Button variant="contained" type="submit" className='w-full' disabled={loading}>
-                {loading ? 'Signing Up...' : 'Sign Up'}
-              </Button>
-            </div>
+            <Button type="submit" size="lg" className="w-full" disabled={loading}>
+              {loading ? 'Creating account…' : 'Sign up'}
+            </Button>
           </form>
+        </LiquidGlass>
 
-          <div className='flex space-x-3 items-center mt-5'>
-            <p>Already Have an Account?</p>
-            <Button variant="contained" onClick={() => navigate("/signin")}>Sign In</Button>
-          </div>
+        <div className="mt-6 flex items-center justify-center gap-2 text-sm">
+          <span className="text-ink-muted">Already have an account?</span>
+          <button
+            onClick={() => navigate('/signin')}
+            className="font-medium text-accent transition-opacity hover:opacity-80"
+          >
+            Sign in
+          </button>
         </div>
-      </div>
-
-      <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={handleSnackbarClose}>
-        <Alert
-          onClose={handleSnackbarClose}
-          severity="success"
-          variant="filled"
-          sx={{
-            width: '100%',
-            bgcolor: 'blue.600',
-            color: 'white'
-          }}
-        >
-          Your Account was successfully created!
-        </Alert>
-      </Snackbar>
+      </motion.div>
     </div>
   );
 };

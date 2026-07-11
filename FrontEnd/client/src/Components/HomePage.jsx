@@ -3,24 +3,31 @@ import { AiOutlineSearch } from 'react-icons/ai';
 import { BiCommentDetail } from 'react-icons/bi';
 import { BsEmojiSmile, BsFilter, BsThreeDotsVertical } from 'react-icons/bs';
 import { TbCircleDashed } from 'react-icons/tb';
+import { IoSend } from 'react-icons/io5';
 import ChatCard from './ChatCard/ChatCard';
 import MessageCard from './MessageCard/MessageCard';
 import { ImAttachment } from 'react-icons/im';
-import "./HomePage.css";
 import { useNavigate } from 'react-router-dom';
 import Profile from './Profile/Profile';
-import Button from '@mui/material/Button';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
 import CreateGroup from './Group/CreateGroup';
 import { useDispatch, useSelector } from 'react-redux';
 import { currentUser, logoutAction, searchUser } from '../Redux/Auth/Action';
 import { createChat, getUsersChat } from '../Redux/Chat/Action';
-import { create } from '@mui/material/styles/createTransitions';
 import { createMessage, getAllMessages } from '../Redux/Message/Action';
 import SockJS from 'sockjs-client/dist/sockjs';
 import {over} from "stompjs";
-import { FaBullseye } from 'react-icons/fa6';
+import LiquidGlass from './ui/LiquidGlass';
+import Input from './ui/Input';
+import IconButton from './ui/IconButton';
+import Avatar from './ui/Avatar';
+import ScrollArea from './ui/ScrollArea';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from './ui/DropdownMenu';
+import { motion } from 'framer-motion';
 
 const HomePage = () => {
   const [querys, setQuerys] = useState('');
@@ -33,7 +40,7 @@ const HomePage = () => {
   const token = localStorage.getItem("jwt");
 
   const [stompClient, setStompClient]=useState();
-  const [isConnect,setIsConnect]=useState(FaBullseye);
+  const [isConnect,setIsConnect]=useState(false);
   const [messages,setMessages]=useState([]);
 
   const handleClickOnChatCard = (userId) => {
@@ -47,16 +54,12 @@ const HomePage = () => {
   
 
   const handleCreateNewMessage = () => {
-    console.log("Current Chat ID:", currentChat.id);
-    console.log("Content:", content);
-
-    if (!currentChat.id || !content) {
-        console.error("Chat ID or content is missing.");
+    if (!currentChat?.id || !content.trim()) {
         return;
     }
 
     dispatch(createMessage({ token, data: { chatId: currentChat.id, content } }));
-    console.log("Create new message dispatched.");
+    setContent(""); // clear the input so Enter can't re-send the same text
 };
 
 
@@ -96,40 +99,35 @@ const connect = () => {
   
 
   useEffect(() => {
-    console.log("ready to send");
     if (message.newMessage && stompClient) {
-      console.log("sending..." ,message.newMessage);
-
-      setMessages([...messages, message.newMessage]);
+      // functional update: don't depend on a stale `messages` snapshot
+      setMessages((prev) => [...prev, message.newMessage]);
       stompClient?.send("/app/message", {}, JSON.stringify(message.newMessage));
     }
   }, [message.newMessage]);
 
 
+  // Subscribe once per (chat, connection) — NOT on every render.
+  // Without the dependency array this re-subscribed on every render, so a
+  // single incoming message was delivered by many stacked subscriptions,
+  // producing duplicate bubbles.
   useEffect(() => {
-    console.log('Checking conditions for subscription...');
-    console.log('isConnect:', isConnect);
-    console.log('stompClient:', stompClient);
-    console.log('auth.reqUser:', auth.reqUser);
-    console.log('currentChat:', currentChat);
     if (isConnect && stompClient && auth.reqUser && currentChat) {
-      console.log("connected to receive");
-      const subscription = stompClient.subscribe("/group/" + currentChat.id.toString(), onMessageRecieve);
-      console.log("------->hello")
-  
-      // Cleanup function to unsubscribe
+      const subscription = stompClient.subscribe(
+        "/group/" + currentChat.id.toString(),
+        onMessageRecieve
+      );
       return () => {
         subscription.unsubscribe();
       };
     }
-  }, ); // Dependency array added
-  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnect, stompClient, auth.reqUser, currentChat]);
+
   const onMessageRecieve = (payload) => {
-    console.log(payload)
-    const receivedMessage = JSON.parse(payload.body); // Parse once
-    console.log("received message", receivedMessage); // Fixed typo
-    setMessages([...messages, receivedMessage]);
-  }
+    const receivedMessage = JSON.parse(payload.body);
+    setMessages((prev) => [...prev, receivedMessage]);
+  };
 
   useEffect(()=>{
    setMessages(message.messages)
@@ -143,19 +141,6 @@ const connect = () => {
   const handleCloseOpenProfile = () => {
     setIsProfile(false);
   };
-
-  const [anchorEl, setAnchorEl] = useState(null);
-  const open = Boolean(anchorEl);
-
-  const handleClick = (e) => {
-    setAnchorEl(e.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  
 
   const [isGroup, setIsGroup] = useState(false);
   const handleCreateGroup = () => {
@@ -228,202 +213,195 @@ const connect = () => {
 
 
   return (
-    <div className='flex h-screen bg-gradient-to-r from-blue-500 to-purple-600 p-8'>
-      {/* Left Div (Contacts) */}
-      <div className="w-[30%] h-full bg-white/20 backdrop-blur-lg rounded-l-lg p-4 shadow-lg">
-        <div className='w-full h-full flex flex-col'>
-          {/* Profile */}
-          {isProfile && <Profile handleCloseOpenProfile={handleCloseOpenProfile} />}
-          {isGroup && <CreateGroup setIsGroup={setIsGroup}/>}
-          {/* Home */}
-          {!isProfile && !isGroup && (
-            <div className='flex justify-between items-center p-3'>
-              <div onClick={handleNavigate} className='flex items-center space-x-3'>
-                <img className='rounded-full w-10 h-10 cursor-pointer' src={auth.reqUser?.profile_picture || ""} alt="User" />
-                <p>{auth.reqUser?.full_name}</p>
-              </div>
-              <div className='space-x-3 text-2xl flex'>
-                <TbCircleDashed />
-                <BiCommentDetail />
-                <div>
-                  <BsThreeDotsVertical id="basic-button"
-                    aria-controls={open ? 'basic-menu' : undefined}
-                    aria-haspopup="true"
-                    aria-expanded={open ? 'true' : undefined}
-                    onClick={handleClick} />
-                  <Menu
-                    id="basic-menu"
-                    anchorEl={anchorEl}
-                    open={open}
-                    onClose={handleClose}
-                    MenuListProps={{
-                      'aria-labelledby': 'basic-button',
-                    }}
-                  >
-                    <MenuItem onClick={handleClose}>Profile</MenuItem>
-                    <MenuItem onClick={handleCreateGroup}>Create Group</MenuItem>
-                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
-                  </Menu>
-                </div>
+    <div className="flex h-screen bg-canvas text-ink">
+      {/* ===== Sidebar ===== */}
+      <div className="w-[340px] h-full bg-surface border-r border-line flex flex-col">
+        {isProfile && <Profile handleCloseOpenProfile={handleCloseOpenProfile} />}
+        {isGroup && <CreateGroup setIsGroup={setIsGroup} />}
+
+        {!isProfile && !isGroup && (
+          <>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-4">
+              <button
+                onClick={handleNavigate}
+                className="flex items-center gap-3 rounded-xl p-1 pr-3 transition-colors hover:bg-glass"
+              >
+                <Avatar src={auth.reqUser?.profile_picture} name={auth.reqUser?.full_name} size="sm" />
+                <span className="font-sans text-sm font-medium">{auth.reqUser?.full_name}</span>
+              </button>
+              <div className="flex items-center gap-1 text-lg">
+                <IconButton title="Status"><TbCircleDashed /></IconButton>
+                <IconButton title="Chats"><BiCommentDetail /></IconButton>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <IconButton title="Menu"><BsThreeDotsVertical /></IconButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={handleNavigate}>Profile</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={handleCreateGroup}>Create Group</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={handleLogout} className="text-red-400">Logout</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
-          )}
 
-          {/* Search Input */}
-          {!isProfile && !isGroup && (
-            <div className='relative flex items-center py-4 px-2'>
-              <input
-                className='border-none outline-none bg-white/20 backdrop-blur-lg rounded-md w-full pl-10 py-2'
-                type='text'
-                placeholder='Search or Start new Chat'
-                onChange={(e) => {
-                  setQuerys(e.target.value);
-                  handleSearch(e.target.value);
-                }}
-                value={querys}
-              />
-              <AiOutlineSearch className='absolute left-3 text-xl' />
-              <BsFilter className='ml-4 text-3xl' />
-            </div>
-          )}
-
-          {/* Contacts List */}{!isProfile && !isGroup && (
-          <div className="bg-white/20 backdrop-blur-lg rounded-xl overflow-y-auto flex-grow px-3">
-  {/* Check if the search query is active and there are search results */}
-  {querys && Array.isArray(auth.searchUser) && auth.searchUser.length > 0 ? (
-    auth.searchUser.map((item, index) => (
-      <div onClick={() => handleClickOnChatCard(item.id)} key={index}>
-        <hr />
-        <ChatCard
-              name={item.full_name}
-              userImg={
-                item.profile_picture ||
-                "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460__340.png"
-              }
-            />
-      </div>
-    ))
-  ) : querys ? (
-    <p>No users found</p>  
-  ) : (
-    /* Render chats if there is no search query */
-    chat.chats.length > 0 ? (
-      chat.chats.map((item, index) => (
-        <div key={index} onClick={() => handleCurrentChat(item)}>
-          <hr />
-          {/* Check if it's a group chat */}
-          {item.group===true ? (
-            // Group chat card
-            <ChatCard
-              name={item.chat_name || "Unnamed Group"} // Ensure group name is used
-              userImg={
-                item.chat_image ||
-                "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460__340.png"
-              }
-            />
-          ) : (
-            // Individual chat card
-            <ChatCard
-              isChat={true}
-              name={
-                auth.reqUser?.id !== item.users[0]?.id
-                  ? item.users[0].full_name
-                  : item.users[1].full_name
-              }
-              userImg={
-                auth.reqUser?.id !== item.users[0]?.id
-                  ? item.users[0].profile_picture ||
-                    "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460__340.png"
-                  : item.users[1].profile_picture ||
-                    "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460__340.png"
-              }
-            />
-          )}
-        </div>
-      ))
-    ): (
-      <p>No chats found</p> 
-    )
-  )}
-</div>)}
-
-
-        </div>
-      </div>
-
-      {/* Right Div (Chats) */}
-      <div className="w-[70%] h-full bg-white/20 backdrop-blur-lg rounded-r-lg p-4 shadow-lg">
-      {!currentChat && (
-        <div className="flex justify-center items-center min-h-full w-full">
-          <div className="relative p-10 bg-white/30 backdrop-blur-md rounded-full shadow-lg">
-            <div className="absolute -bottom-3 -left-3 w-12 h-12 bg-white/30 backdrop-blur-md rounded-full"></div>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 16.5A3.5 3.5 0 0117.5 20h-11l-4 4V6.5A3.5 3.5 0 016.5 3h11A3.5 3.5 0 0121 6.5v10z" />
-            </svg>
-          </div>
-        </div>
-      )}
-      {currentChat && (
-        <div className="h-full flex flex-col">
-          <div className="header bg-white/20 backdrop-blur-lg rounded-l-lg shadow-lg top-0 rounded-xl shadow-md">
-            <div className="flex justify-between">
-              <div className="py-3 space-x-4 flex items-center px-3">
-                <img
-                  className="w-10 h-10 rounded-full"
-                  src={currentChat.group === true
-                    ? currentChat.chat_image || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460__340.png"
-                    : (auth.reqUser?.id !== currentChat.users[0]?.id
-                      ? currentChat.users[0].profile_picture || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460__340.png"
-                      : currentChat.users[1].profile_picture || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460__340.png")}
-                  alt=""
+            {/* Search */}
+            <div className="flex items-center gap-2 px-4 pb-3">
+              <div className="relative flex-1">
+                <AiOutlineSearch className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
+                <Input
+                  className="pl-10"
+                  placeholder="Search or start a new chat"
+                  onChange={(e) => {
+                    setQuerys(e.target.value);
+                    handleSearch(e.target.value);
+                  }}
+                  value={querys}
                 />
-                <p>
-                  {currentChat.group === true
-                    ? currentChat.chat_name || "Unnamed Group"
+              </div>
+              <IconButton title="Filter"><BsFilter /></IconButton>
+            </div>
+
+            {/* Contacts */}
+            <ScrollArea className="flex-1" viewportClassName="px-2 pb-3">
+              {querys && Array.isArray(auth.searchUser) && auth.searchUser.length > 0 ? (
+                auth.searchUser.map((item, index) => (
+                  <div onClick={() => handleClickOnChatCard(item.id)} key={index}>
+                    <ChatCard name={item.full_name} userImg={item.profile_picture} />
+                  </div>
+                ))
+              ) : querys ? (
+                <p className="px-4 py-6 text-center text-sm text-ink-muted">No users found</p>
+              ) : chat.chats.length > 0 ? (
+                chat.chats.map((item, index) => {
+                  const isGroupChat = item.group === true;
+                  const other =
+                    auth.reqUser?.id !== item.users?.[0]?.id ? item.users?.[0] : item.users?.[1];
+                  const name = isGroupChat
+                    ? item.chat_name || 'Unnamed Group'
+                    : other?.full_name;
+                  const img = isGroupChat ? item.chat_image : other?.profile_picture;
+                  return (
+                    <div key={index} onClick={() => handleCurrentChat(item)}>
+                      <ChatCard
+                        isChat={!isGroupChat}
+                        name={name}
+                        userImg={img}
+                        selected={currentChat?.id === item.id}
+                      />
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="px-4 py-6 text-center text-sm text-ink-muted">No chats found</p>
+              )}
+            </ScrollArea>
+          </>
+        )}
+      </div>
+
+      {/* ===== Chat pane ===== */}
+      <div className="relative flex-1 h-full flex flex-col overflow-hidden">
+        {/* ambient gold wash */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(700px 400px at 75% 0%, rgba(228,197,144,0.06), transparent 60%)',
+          }}
+        />
+
+        {!currentChat && (
+          <div className="relative flex flex-1 flex-col items-center justify-center px-6 text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <BiCommentDetail className="mx-auto mb-6 text-5xl text-ink-muted" />
+              <h2 className="font-display text-4xl text-ink">Select a conversation</h2>
+              <p className="mx-auto mt-3 max-w-sm font-sans text-sm text-ink-muted">
+                Choose a chat from the left, or search for someone to start a new one.
+              </p>
+            </motion.div>
+          </div>
+        )}
+
+        {currentChat && (
+          <div className="relative z-10 flex h-full flex-col">
+            {/* Floating glass header */}
+            <LiquidGlass className="mx-4 mt-4 flex items-center gap-3 rounded-2xl px-4 py-3">
+              <Avatar
+                size="sm"
+                name={
+                  currentChat.group === true
+                    ? currentChat.chat_name
                     : (auth.reqUser?.id === currentChat.users[0]?.id
-                      ? currentChat.users[1]?.full_name
-                      : currentChat.users[0]?.full_name)}
+                        ? currentChat.users[1]?.full_name
+                        : currentChat.users[0]?.full_name)
+                }
+                src={
+                  currentChat.group === true
+                    ? currentChat.chat_image
+                    : (auth.reqUser?.id !== currentChat.users[0]?.id
+                        ? currentChat.users[0]?.profile_picture
+                        : currentChat.users[1]?.profile_picture)
+                }
+              />
+              <div className="relative flex-1">
+                <p className="font-sans text-sm font-medium">
+                  {currentChat.group === true
+                    ? currentChat.chat_name || 'Unnamed Group'
+                    : (auth.reqUser?.id === currentChat.users[0]?.id
+                        ? currentChat.users[1]?.full_name
+                        : currentChat.users[0]?.full_name)}
                 </p>
+                <p className="font-mono text-[10px] text-accent">online</p>
               </div>
-              <div className="py-3 space-x-4 items-center px-3">
-                <AiOutlineSearch />
+              <IconButton title="Search"><AiOutlineSearch /></IconButton>
+            </LiquidGlass>
+
+            {/* Messages */}
+            <ScrollArea className="flex-1" viewportClassName="px-6 py-6">
+              <div className="flex flex-col gap-3">
+                {messages.length > 0 &&
+                  messages.map((item, i) => (
+                    <MessageCard
+                      key={i}
+                      isReqUserMessage={item.user.id === auth.reqUser.id}
+                      content={item.content}
+                      timestamp={item.timestamp}
+                    />
+                  ))}
+                <div ref={bottomRef} />
               </div>
-            </div>
-          </div>
+            </ScrollArea>
 
-          {/* Messages */}
-          <div className="px-10 h-[calc(100vh-250px)] overflow-y-auto space-y-2">
-            <div className="flex flex-col space-y-4">
-              {console.log("messages are ", message.messages)}
-              {messages.length > 0 && messages.map((item, i) => (
-                <MessageCard
-                  key={i}
-                  isReqUserMessage={item.user.id === auth.reqUser.id}
-                  content={item.content}
-                />
-              ))}
-              {/* Add the reference to the last message */}
-              <div ref={bottomRef} />
-            </div>
-          </div>
-
-          {/* Message input */}
-          <div className="bg-white/20 backdrop-blur-lg rounded-l-lg shadow-lg p-3">
-            <div className="flex items-center space-x-4">
-              <ImAttachment className="text-2xl" />
+            {/* Floating glass composer */}
+            <LiquidGlass className="mx-4 mb-4 flex items-center gap-2 rounded-2xl px-3 py-2.5">
+              <IconButton title="Attach"><ImAttachment /></IconButton>
               <input
-                className="border-none outline-none bg-white/20 backdrop-blur-lg rounded-md w-full py-2 px-4"
-                placeholder="Type a message..."
+                className="relative flex-1 bg-transparent px-1 font-sans text-sm text-ink outline-none placeholder:text-ink-muted"
+                placeholder="Type a message…"
                 onChange={(e) => setContent(e.target.value)}
                 value={content}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateNewMessage();
+                }}
               />
-              <button onClick={handleCreateNewMessage}>Send</button>
-              <BsEmojiSmile className="text-2xl" />
-            </div>
+              <IconButton title="Emoji"><BsEmojiSmile /></IconButton>
+              <button
+                onClick={handleCreateNewMessage}
+                className="relative grid h-10 w-10 place-items-center rounded-xl bg-accent text-accent-fg shadow-glow transition-transform hover:-translate-y-0.5"
+                title="Send"
+              >
+                <IoSend />
+              </button>
+            </LiquidGlass>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
     </div>
   );
 };
