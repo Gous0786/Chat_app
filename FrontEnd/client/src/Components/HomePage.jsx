@@ -28,7 +28,8 @@ import {
   DropdownMenuItem,
 } from './ui/DropdownMenu';
 import { motion } from 'framer-motion';
-import { ensureSession } from '../signal/session';
+import { ensureSession, encryptForPeer, decryptFromPeer } from '../signal/session';
+import { signalStore } from '../signal/store';
 
 const HomePage = () => {
   const [querys, setQuerys] = useState('');
@@ -43,6 +44,10 @@ const HomePage = () => {
   const [stompClient, setStompClient]=useState();
   const [isConnect,setIsConnect]=useState(false);
   const [messages,setMessages]=useState([]);
+  // Raw messages (ciphertext) mapped to display text via decryption/cache.
+  const [renderMessages, setRenderMessages] = useState([]);
+  // Plaintext of the message we just sent, so our own bubble shows plaintext.
+  const pendingPlaintextRef = useRef(null);
 
   const handleClickOnChatCard = (userId) => {
     //setCurrentChat(item)
@@ -54,13 +59,31 @@ const HomePage = () => {
   };
   
 
-  const handleCreateNewMessage = () => {
+  const handleCreateNewMessage = async () => {
     if (!currentChat?.id || !content.trim()) {
         return;
     }
 
-    dispatch(createMessage({ token, data: { chatId: currentChat.id, content } }));
-    setContent(""); // clear the input so Enter can't re-send the same text
+    const plaintext = content;
+    setContent(""); // clear the input immediately so Enter can't re-send
+
+    const peerId = getPeerUserId(currentChat);
+    if (peerId) {
+      // 1:1 chat → encrypt with the Signal session before it leaves the browser.
+      try {
+        await ensureSession(peerId, token);
+        const envelope = await encryptForPeer(peerId, plaintext);
+        // Remember what we typed so our own bubble shows plaintext (we can't
+        // decrypt our own outgoing ciphertext with the ratchet).
+        pendingPlaintextRef.current = plaintext;
+        dispatch(createMessage({ token, data: { chatId: currentChat.id, content: envelope, encrypted: true } }));
+      } catch (e) {
+        console.error("encryption failed, message not sent:", e);
+      }
+    } else {
+      // group / fallback → plaintext (groups are disabled in Stage 7)
+      dispatch(createMessage({ token, data: { chatId: currentChat.id, content: plaintext } }));
+    }
 };
 
 
@@ -101,9 +124,16 @@ const connect = () => {
 
   useEffect(() => {
     if (message.newMessage && stompClient) {
+      const nm = message.newMessage;
+      // Cache the plaintext of our own just-sent message keyed by its server id,
+      // so our bubble renders plaintext (we can't decrypt our own ciphertext).
+      if (nm.encrypted && pendingPlaintextRef.current != null && nm.id != null) {
+        signalStore.cachePlaintext(nm.id, pendingPlaintextRef.current);
+        pendingPlaintextRef.current = null;
+      }
       // functional update: don't depend on a stale `messages` snapshot
-      setMessages((prev) => [...prev, message.newMessage]);
-      stompClient?.send("/app/message", {}, JSON.stringify(message.newMessage));
+      setMessages((prev) => [...prev, nm]);
+      stompClient?.send("/app/message", {}, JSON.stringify(nm));
     }
   }, [message.newMessage]);
 
@@ -133,6 +163,46 @@ const connect = () => {
   useEffect(()=>{
    setMessages(message.messages)
   },[message.messages])
+
+  // Map raw messages (which may be ciphertext) to display text. Encrypted
+  // messages are decrypted once and their plaintext cached; already-cached and
+  // legacy plaintext messages pass through. Runs whenever the raw list changes.
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const list = messages || [];
+      const out = [];
+      for (const msg of list) {
+        if (!msg.encrypted) {
+          out.push({ ...msg, displayText: msg.content });
+          continue;
+        }
+        // cached (our own sends, or previously decrypted)?
+        const cached = msg.id != null ? await signalStore.getCachedPlaintext(msg.id) : undefined;
+        if (cached !== undefined) {
+          out.push({ ...msg, displayText: cached });
+          continue;
+        }
+        const isMine = msg.user?.id === auth.reqUser?.id;
+        if (isMine) {
+          // our own ciphertext we can't decrypt and haven't cached yet
+          out.push({ ...msg, displayText: "[sent]" });
+          continue;
+        }
+        // incoming: decrypt once, then cache
+        try {
+          const text = await decryptFromPeer(msg.user.id, msg.content);
+          if (msg.id != null) await signalStore.cachePlaintext(msg.id, text);
+          out.push({ ...msg, displayText: text });
+        } catch (e) {
+          out.push({ ...msg, displayText: "[unable to decrypt]", decryptFailed: true });
+        }
+      }
+      if (!cancelled) setRenderMessages(out);
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [messages, auth.reqUser?.id]);
   
   
   const handleNavigate = () => {
@@ -384,13 +454,15 @@ const connect = () => {
             {/* Messages */}
             <ScrollArea className="flex-1" viewportClassName="px-6 py-6">
               <div className="flex flex-col gap-3">
-                {messages.length > 0 &&
-                  messages.map((item, i) => (
+                {renderMessages.length > 0 &&
+                  renderMessages.map((item, i) => (
                     <MessageCard
                       key={i}
                       isReqUserMessage={item.user.id === auth.reqUser.id}
-                      content={item.content}
+                      content={item.displayText}
                       timestamp={item.timestamp}
+                      encrypted={item.encrypted}
+                      decryptFailed={item.decryptFailed}
                     />
                   ))}
                 <div ref={bottomRef} />

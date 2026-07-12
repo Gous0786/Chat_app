@@ -9,7 +9,7 @@ import Timestamp from '../ui/Timestamp';
  *  - Received message: neutral glass, off-white text, left.
  * This is the primary surface carrying the gold "this is you" identity.
  */
-const MessageCard = ({ isReqUserMessage, content, timestamp }) => {
+const MessageCard = ({ isReqUserMessage, content, timestamp, decryptFailed }) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -22,7 +22,7 @@ const MessageCard = ({ isReqUserMessage, content, timestamp }) => {
           : 'self-start bg-glass text-ink border border-line rounded-2xl rounded-bl-md backdrop-blur-md'
       )}
     >
-      <p className="whitespace-pre-wrap break-words">{content}</p>
+      <p className={cn('whitespace-pre-wrap break-words', decryptFailed && 'italic opacity-60')}>{content}</p>
       {timestamp && (
         <Timestamp
           value={timestamp}

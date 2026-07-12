@@ -4,7 +4,12 @@ import {
   SessionCipher,
 } from '@privacyresearch/libsignal-protocol-typescript';
 import { signalStore } from './store';
-import { base64ToArrayBuffer } from './encoding';
+import {
+  base64ToArrayBuffer,
+  arrayBufferToBase64,
+  stringToArrayBuffer,
+  arrayBufferToString,
+} from './encoding';
 import { BASE_API_URL } from '../config/api';
 
 // v1 is single-device: every user is device 1.
@@ -63,3 +68,37 @@ export function getCipher(peerUserId) {
   }
   return cipherCache.get(key);
 }
+
+/**
+ * Encrypt plaintext for a peer. Returns a self-describing JSON envelope string
+ * to store as the message `content`: {v, type, body(base64)}.
+ * `type` is 3 (PreKeyWhisperMessage) for the first message, 1 afterwards.
+ */
+export async function encryptForPeer(peerUserId, plaintext) {
+  const cipher = getCipher(peerUserId);
+  const ciphertext = await cipher.encrypt(stringToArrayBuffer(plaintext));
+  // `body` is a binary string; base64 it so it survives JSON + a TEXT column.
+  return JSON.stringify({
+    v: 1,
+    type: ciphertext.type,
+    body: btoa(ciphertext.body),
+  });
+}
+
+/**
+ * Decrypt an envelope produced by encryptForPeer. `senderUserId` is the peer.
+ * Throws on auth failure / malformed input — callers should catch and fall back.
+ */
+export async function decryptFromPeer(senderUserId, envelopeString) {
+  const cipher = getCipher(senderUserId);
+  const env = JSON.parse(envelopeString);
+  const body = atob(env.body); // back to binary string
+  const plaintextBuf =
+    env.type === 3
+      ? await cipher.decryptPreKeyWhisperMessage(body, 'binary')
+      : await cipher.decryptWhisperMessage(body, 'binary');
+  return arrayBufferToString(plaintextBuf);
+}
+
+// re-exported for callers that need raw encoding helpers
+export { arrayBufferToBase64 };
