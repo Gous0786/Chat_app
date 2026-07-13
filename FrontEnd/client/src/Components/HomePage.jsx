@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AiOutlineSearch } from 'react-icons/ai';
 import { BiCommentDetail } from 'react-icons/bi';
-import { BsEmojiSmile, BsFilter, BsThreeDotsVertical } from 'react-icons/bs';
+import { BsEmojiSmile, BsFilter, BsThreeDotsVertical, BsShieldLock } from 'react-icons/bs';
 import { TbCircleDashed } from 'react-icons/tb';
 import { IoSend } from 'react-icons/io5';
 import ChatCard from './ChatCard/ChatCard';
@@ -9,11 +9,11 @@ import MessageCard from './MessageCard/MessageCard';
 import { ImAttachment } from 'react-icons/im';
 import { useNavigate } from 'react-router-dom';
 import Profile from './Profile/Profile';
-import CreateGroup from './Group/CreateGroup';
 import { useDispatch, useSelector } from 'react-redux';
 import { currentUser, logoutAction, searchUser } from '../Redux/Auth/Action';
 import { createChat, getUsersChat } from '../Redux/Chat/Action';
 import { createMessage, getAllMessages } from '../Redux/Message/Action';
+import { BASE_API_URL } from '../config/api';
 import SockJS from 'sockjs-client/dist/sockjs';
 import {over} from "stompjs";
 import LiquidGlass from './ui/LiquidGlass';
@@ -88,7 +88,9 @@ const HomePage = () => {
 
 
 const connect = () => {
-  const sock = new SockJS("http://localhost:5454/websocket");
+  // Derive the socket URL from the API base so prod can use https/wss.
+  // (SockJS itself negotiates the ws/wss transport from the http(s) origin.)
+  const sock = new SockJS(`${BASE_API_URL}/websocket`);
   const temp = over(sock);
   setStompClient(temp);
 
@@ -213,11 +215,6 @@ const connect = () => {
     setIsProfile(false);
   };
 
-  const [isGroup, setIsGroup] = useState(false);
-  const handleCreateGroup = () => {
-    setIsGroup(true);
-  };
-
   // Loading state
   const [loading, setLoading] = useState(true);
 
@@ -261,6 +258,10 @@ const connect = () => {
     const other = chatItem.users.find((u) => u.id !== auth.reqUser?.id);
     return other?.id ?? null;
   };
+
+  // Only show 1:1 chats — groups are hidden until they support E2E encryption,
+  // so a group composer (which would send plaintext) can never be opened.
+  const directChats = (chat.chats || []).filter((c) => c.group !== true);
 
   // Establish a Signal session with the peer when a 1:1 chat is opened.
   useEffect(() => {
@@ -306,9 +307,8 @@ const connect = () => {
       {/* ===== Sidebar ===== */}
       <div className="w-[340px] h-full bg-surface border-r border-line flex flex-col">
         {isProfile && <Profile handleCloseOpenProfile={handleCloseOpenProfile} />}
-        {isGroup && <CreateGroup setIsGroup={setIsGroup} />}
 
-        {!isProfile && !isGroup && (
+        {!isProfile && (
           <>
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-4">
@@ -328,7 +328,7 @@ const connect = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onSelect={handleNavigate}>Profile</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={handleCreateGroup}>Create Group</DropdownMenuItem>
+                    {/* Group chat disabled: groups aren't E2E-encrypted yet (would send plaintext) */}
                     <DropdownMenuItem onSelect={handleLogout} className="text-red-400">Logout</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -362,21 +362,16 @@ const connect = () => {
                 ))
               ) : querys ? (
                 <p className="px-4 py-6 text-center text-sm text-ink-muted">No users found</p>
-              ) : chat.chats.length > 0 ? (
-                chat.chats.map((item, index) => {
-                  const isGroupChat = item.group === true;
+              ) : directChats.length > 0 ? (
+                directChats.map((item, index) => {
                   const other =
                     auth.reqUser?.id !== item.users?.[0]?.id ? item.users?.[0] : item.users?.[1];
-                  const name = isGroupChat
-                    ? item.chat_name || 'Unnamed Group'
-                    : other?.full_name;
-                  const img = isGroupChat ? item.chat_image : other?.profile_picture;
                   return (
                     <div key={index} onClick={() => handleCurrentChat(item)}>
                       <ChatCard
-                        isChat={!isGroupChat}
-                        name={name}
-                        userImg={img}
+                        isChat={true}
+                        name={other?.full_name}
+                        userImg={other?.profile_picture}
                         selected={currentChat?.id === item.id}
                       />
                     </div>
@@ -446,7 +441,9 @@ const connect = () => {
                         ? currentChat.users[1]?.full_name
                         : currentChat.users[0]?.full_name)}
                 </p>
-                <p className="font-mono text-[10px] text-accent">online</p>
+                <p className="flex items-center gap-1 font-mono text-[10px] text-accent">
+                  <BsShieldLock /> end-to-end encrypted
+                </p>
               </div>
               <IconButton title="Search"><AiOutlineSearch /></IconButton>
             </LiquidGlass>
