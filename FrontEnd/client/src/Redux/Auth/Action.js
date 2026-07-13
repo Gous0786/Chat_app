@@ -1,6 +1,6 @@
 import { BASE_API_URL } from "../../config/api";
 import { LOGIN, LOGOUT, REGISTER, REQ_USER, SEARCH_USER, UPDATE_USER } from "./ActionType";
-import { initSignalIdentity, replenishPreKeys } from "../../signal/keys";
+import { initSignalIdentity, setupIdentity, replenishPreKeys } from "../../signal/keys";
 
 export const register=(data)=>async(dispatch)=>{
     try{
@@ -16,8 +16,13 @@ export const register=(data)=>async(dispatch)=>{
         const resData=await res.json();
         if (resData.jwt) {
             localStorage.setItem("jwt", resData.jwt);  // Store JWT in localStorage
+            // Set up Signal identity with the password (enables encrypted backup).
+            try {
+                await setupIdentity(data.password, resData.jwt);
+                await replenishPreKeys(resData.jwt);
+            } catch (e) { console.error("Signal setup failed:", e); }
         }
-        
+
         console.log("register",resData)
         dispatch({type:REGISTER,payload:resData});
     }
@@ -41,6 +46,12 @@ export const login = (data) => async (dispatch) => {
         console.log("login ", resData);
         if (resData.jwt) {
             localStorage.setItem("jwt", resData.jwt);  // Store JWT in localStorage
+            // Set up Signal identity with the password: generate on first login,
+            // or restore from the encrypted backup on a new device.
+            try {
+                await setupIdentity(data.password, resData.jwt);
+                await replenishPreKeys(resData.jwt);
+            } catch (e) { console.error("Signal setup failed:", e); }
         }
         dispatch({ type: LOGIN, payload: resData });
     } catch (error) {
