@@ -1,295 +1,178 @@
-# Chat App - WhatsApp Web Clone
+# Aura — an end-to-end encrypted chat app
 
-A real-time chat application built with React and Spring Boot, featuring WebSocket support for instant messaging.
+A real-time chat application built with React and Spring Boot: WebSocket messaging,
+a dark/gold "liquid glass" interface, and genuine **Signal Protocol end-to-end
+encryption** for direct messages.
 
 ## Features
 
-✨ **Real-Time Messaging** - Instant message delivery using WebSocket (Socket.IO)
-👥 **User Accounts** - Secure authentication with JWT tokens
-🔐 **Secure** - Password encryption and token-based authentication
-💬 **Direct Chat** - One-on-one conversations
-👫 **Group Chat** - Create and manage group conversations
-📱 **Responsive UI** - Mobile-friendly interface with Material-UI
-🔄 **Live Updates** - Real-time status updates and message notifications
+- 🔐 **End-to-end encryption** — direct messages use the real Signal Protocol
+  (X3DH handshake + Double Ratchet). The server stores and relays only
+  ciphertext; private keys never leave the browser. See
+  [docs/ENCRYPTION.md](docs/ENCRYPTION.md) for how it works.
+- ✨ **Real-time messaging** — instant delivery over WebSocket (STOMP/SockJS)
+- 👥 **JWT authentication** — signup/login with BCrypt password hashing
+- 💬 **Direct chat** — one-on-one conversations
+- 🔑 **Password-protected key backup** — recover your encryption identity on a
+  new device by re-entering your password (PBKDF2 + AES-GCM)
+- 🎨 **Custom dark UI** — all-black canvas, muted-gold accent, Playfair Display
+  headings, and a real Apple-style "liquid glass" effect on floating panels
+  (Chromium; degrades gracefully elsewhere)
+- 🐳 **Dockerized** — the whole stack (frontend, backend, MySQL) runs with one
+  command
+
+> **Note:** group chat exists in the data model but is currently disabled in
+> the UI — group messages aren't end-to-end encrypted yet (see
+> [docs/ENCRYPTION.md](docs/ENCRYPTION.md#honest-about-the-edges)), so it's
+> hidden rather than silently sending plaintext.
 
 ## Tech Stack
 
-### Frontend
-- **React 18** - UI library
-- **Redux** - State management
-- **Material-UI (MUI)** - Component library
-- **Tailwind CSS** - Styling
-- **Socket.IO** - WebSocket communication
-- **React Router** - Navigation
+### Frontend (`FrontEnd/client`)
+- **React 18** + **Redux** — UI and state
+- **Tailwind CSS** — styling, with a custom dark/gold theme
+- **Radix UI** + **class-variance-authority** + **Framer Motion** — accessible
+  primitives, variants, and animation (the "shadcn stack," hand-wired for
+  Create React App)
+- **`@privacyresearch/libsignal-protocol-typescript`** — Signal Protocol
+  (X3DH + Double Ratchet) in the browser via WebCrypto
+- **`idb`** — IndexedDB wrapper for the local key store
+- **`sockjs-client` + `stompjs`** — WebSocket/STOMP client
+- **`@fontsource-variable/*`** — self-hosted Playfair Display, DM Sans,
+  JetBrains Mono (no font CDN)
 
-### Backend
-- **Spring Boot 3.0.5** - Java framework
-- **Spring Security** - Authentication & Authorization
-- **JWT (JSON Web Tokens)** - Token-based authentication
-- **Spring Data JPA** - ORM framework
-- **MySQL** - Database
-- **WebSocket** - Real-time communication
+### Backend (`Backend`)
+- **Spring Boot 3.0.5** (Java 17)
+- **Spring Security** + **JWT** — stateless authentication
+- **Spring Data JPA** + **MySQL 8** — persistence
+- **Spring WebSocket (STOMP)** — real-time relay (the server never inspects
+  message content — it's a blind relay for direct messages)
 
 ## Getting Started
 
-### Quick Start (5 minutes)
-Follow the [QUICK_START.md](QUICK_START.md) guide to get the app running locally in minutes.
+The fastest way to run everything is **Docker Compose** — it builds and starts
+the frontend, backend, and MySQL together.
 
 ### Prerequisites
-- Java 17+
-- Node.js 16+
-- MySQL 8.0+
-- Maven 3.8+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
-## Setup Instructions
+### Run it
 
-### 1. Database Setup
 ```bash
-mysql -u root -p
-CREATE DATABASE whatsapp;
-CREATE USER 'chat_user'@'localhost' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON whatsapp.* TO 'chat_user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-### 2. Backend Setup
-```bash
-cd Backend
+git clone <this-repo>
+cd Chat_app
 cp .env.example .env
-# Edit .env with your database credentials
-mvn clean package -DskipTests
-mvn spring-boot:run
+# edit .env: set a real JWT_SECRET_KEY (see below)
+docker compose up -d --build
 ```
-Backend runs on: `http://localhost:5454`
 
-### 3. Frontend Setup
+- **Frontend:** http://localhost:3000
+- **Backend:** http://localhost:5454
+- **MySQL:** localhost:3306
+
+Generate a secret for `JWT_SECRET_KEY` in `.env`:
 ```bash
-cd FrontEnd/client
-npm install
-cp .env.example .env.local
-npm start
+openssl rand -base64 32
 ```
-Frontend opens at: `http://localhost:3000`
+
+Full details: [QUICK_START.md](QUICK_START.md). Running the pieces individually
+without Docker (Java/Maven/Node/MySQL installed locally) is also documented
+there.
 
 ## Documentation
 
-- **[QUICK_START.md](QUICK_START.md)** - Get running in 5 minutes
-- **[ENV_CONFIGURATION.md](ENV_CONFIGURATION.md)** - All environment variables explained
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide (Docker, AWS, etc.)
-- **[.gitignore files](.gitignore)** - Files that should NOT be committed
+- **[QUICK_START.md](QUICK_START.md)** — get running in 5 minutes (Docker or manual)
+- **[ENV_CONFIGURATION.md](ENV_CONFIGURATION.md)** — every environment variable explained
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — deploying beyond localhost, including free-tier options
+- **[docs/ENCRYPTION.md](docs/ENCRYPTION.md)** — how the end-to-end encryption works
+- **[.gitignore](.gitignore)** — what's excluded from git
 
 ## Project Structure
 
 ```
 Chat_app/
-├── Backend/                    # Spring Boot API
-│   ├── src/main/java/         # Java source code
-│   ├── src/main/resources/    # Configuration files
-│   │   ├── application.properties      # Dev config
-│   │   └── application-prod.properties # Prod config
-│   ├── .env.example           # Environment variables template
-│   ├── pom.xml               # Maven dependencies
-│   └── mvnw                  # Maven wrapper
-├── FrontEnd/
-│   └── client/               # React application
-│       ├── src/              # React components
-│       ├── public/           # Static files
-│       ├── .env.example      # Environment variables template
-│       ├── package.json      # Node dependencies
-│       └── tailwind.config.js # Tailwind CSS config
-├── README.md                 # This file
-├── QUICK_START.md           # Quick start guide
-├── ENV_CONFIGURATION.md     # Environment configuration guide
-└── DEPLOYMENT.md            # Deployment instructions
-```
-
-## Environment Configuration
-
-### Backend Environment Variables (.env)
-```env
-SPRING_APPLICATION_NAME=Web
-SERVER_PORT=5454
-SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/whatsapp
-SPRING_DATASOURCE_USERNAME=chat_user
-SPRING_DATASOURCE_PASSWORD=your_password
-JWT_SECRET_KEY=generate_a_strong_32_char_key
-SPRING_PROFILES_ACTIVE=dev
-```
-
-### Frontend Environment Variables (.env.local)
-```env
-REACT_APP_API_BASE_URL=http://localhost:5454
-REACT_APP_ENV=development
-```
-
-For detailed configuration options, see [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md).
-
-## Common Commands
-
-### Backend
-```bash
-mvn clean package         # Build backend
-mvn spring-boot:run      # Run backend
-mvn test                 # Run tests
-```
-
-### Frontend
-```bash
-npm install              # Install dependencies
-npm start               # Development server
-npm build               # Production build
-npm test                # Run tests
+├── Backend/                        # Spring Boot API
+│   ├── src/main/java/…/controller/ # REST + WebSocket endpoints
+│   ├── src/main/java/…/model/      # JPA entities (User, Chat, Message, Signal keys)
+│   ├── src/main/resources/
+│   │   └── application.properties  # env-var-driven config
+│   ├── Dockerfile
+│   └── .env.example
+├── FrontEnd/client/                 # React app
+│   ├── src/Components/             # screens + ui/ primitives
+│   ├── src/signal/                 # Signal Protocol store, keys, sessions, backup
+│   ├── src/Redux/                  # auth/chat/message state
+│   ├── Dockerfile
+│   └── .env.example
+├── docs/
+│   └── ENCRYPTION.md               # E2E encryption explainer
+├── docker-compose.yml               # full stack: mysql + backend + frontend
+├── .env.example                     # root env for docker-compose
+└── README.md
 ```
 
 ## Authentication
 
-The app uses **JWT (JSON Web Tokens)** for authentication:
+JWT-based, stateless:
 
-1. **Sign Up** - Create a new account with email and password
-2. **Sign In** - Login with credentials to receive JWT token
-3. **Token Storage** - Token is stored in browser (localStorage/Redux)
-4. **API Requests** - Token is sent in `Authorization: Bearer <token>` header
-5. **Token Expiration** - Tokens expire after 24 hours (configurable)
+1. **Sign up** (`POST /auth/signup`) or **sign in** (`POST /auth/login`) → receive a JWT
+2. The frontend stores the token and attaches it as `Authorization: Bearer <token>`
+   on every API request and the WebSocket connection
+3. Passwords are hashed with BCrypt server-side; the hash is never sent back to clients
 
-## WebSocket Communication
+## Real-time messaging
 
-Real-time messaging is powered by WebSocket using Socket.IO:
-- **Connection** - Established when user logs in
-- **Events** - Message send/receive, typing indicators, online status
-- **Rooms** - Chat rooms for group conversations
-- **Fallback** - Automatic fallback to polling if WebSocket unavailable
+STOMP over SockJS. The server relays direct-message payloads verbatim — for
+encrypted messages, it never sees plaintext, only the ciphertext envelope. See
+[docs/ENCRYPTION.md](docs/ENCRYPTION.md) for the full mechanism.
 
-## Security Features
+## API Overview
 
-🔒 **Password Encryption** - Bcrypt password hashing
-🔐 **JWT Tokens** - Secure token-based authentication
-🛡️ **CORS Protection** - Cross-origin request validation
-✅ **Input Validation** - Request validation on backend
-🚫 **XSS Protection** - React automatic escaping
+| Area | Endpoint | Notes |
+|---|---|---|
+| Auth | `POST /auth/signup`, `POST /auth/login` | Returns `{ jwt, status }` |
+| Users | `GET /api/users/profile`, `GET /api/users/query`, `PUT /api/users/update/{id}` | JWT required |
+| Chats | `POST /api/chats/single`, `POST /api/chats/group`, `GET /api/chats/user` | JWT required |
+| Messages | `POST /api/messages/create`, `GET /api/messages/chat/{chatId}` | Content may be an encrypted envelope |
+| Signal keys | `POST /api/keys/bundle`, `GET /api/keys/bundle/{userId}`, `GET /api/keys/count` | Public key material only — see [docs/ENCRYPTION.md](docs/ENCRYPTION.md) |
+| Key backup | `POST /api/backup`, `GET /api/backup` | Opaque, password-encrypted blob |
+| WebSocket | `/websocket` (SockJS), app prefix `/app`, broker `/group` | Real-time relay |
 
-## Deployment
+## Security notes
 
-For complete deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
-
-### Quick Deployment Options:
-1. **Manual Server** - Ubuntu/Linux with Nginx
-2. **Docker** - Containerized deployment with docker-compose
-3. **Cloud** - AWS Elastic Beanstalk, GCP App Engine, Azure App Service
-4. **Serverless** - AWS Lambda, Google Cloud Functions (requires refactoring)
-
-### Production Checklist:
-- [ ] Change all default passwords
-- [ ] Generate strong JWT secret key
-- [ ] Use HTTPS/SSL certificates
-- [ ] Configure proper CORS
-- [ ] Set up database backups
-- [ ] Enable monitoring and logging
-- [ ] Configure firewall rules
-
-## File Exclusions
-
-Files that should **NOT** be pushed to GitHub:
-
-### Sensitive Files
-- `.env` files (commit `.env.example` instead)
-- Credentials and API keys
-- Database files (*.db, *.sqlite)
-
-### Build Artifacts
-- Backend: `target/`, `build/`, `.mvn/wrapper/`
-- Frontend: `node_modules/`, `build/`, `.pnp`, `/coverage`
-
-### IDE/OS Files
-- `.idea/` (IntelliJ)
-- `.vscode/` (VS Code)
-- `.DS_Store` (macOS)
-- `Thumbs.db` (Windows)
-
-### Logs and Cache
-- `*.log` files
-- `.gradle/`, `.pytest_cache/`
-
-See [.gitignore](.gitignore) files for complete list.
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/signup` - Create new account
-- `POST /api/auth/signin` - Login and get JWT token
-
-### Users
-- `GET /api/users` - Get all users
-- `GET /api/users/:id` - Get user by ID
-- `PUT /api/users/:id` - Update user profile
-
-### Chats
-- `POST /api/chats` - Create new chat
-- `GET /api/chats` - Get all user chats
-- `GET /api/chats/:id` - Get chat details
-- `POST /api/chats/:id/group` - Create group chat
-
-### Messages
-- `POST /api/messages` - Send message
-- `GET /api/messages/:chatId` - Get chat messages
-- `DELETE /api/messages/:id` - Delete message
-
-For complete API documentation, see the Backend code documentation.
+- 🔐 **End-to-end encryption** for direct messages (Signal Protocol) — see [docs/ENCRYPTION.md](docs/ENCRYPTION.md)
+- 🔑 Password hashing with BCrypt; password hashes are never serialized to clients
+- 🛡️ CORS restricted to the configured frontend origin
+- ✅ Server-side request validation
+- 🚫 React's automatic output escaping mitigates XSS
+- ⚠️ **HTTPS/WSS is required for E2E encryption in production** — the browser's
+  Web Crypto API only runs in a secure context. `localhost` counts as secure
+  for local dev; a real deployment needs TLS. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Troubleshooting
 
-### Backend Issues
-- **Port 5454 in use** - Kill the process: `lsof -i :5454`
-- **Database connection error** - Check MySQL is running and credentials are correct
-- **JWT secret too short** - Generate 32+ character secret: `openssl rand -base64 32`
-
-### Frontend Issues
-- **Cannot connect to backend** - Check `REACT_APP_API_BASE_URL` in `.env.local`
-- **Blank page** - Check browser console for errors (F12)
-- **CORS errors** - Backend CORS configuration might need updating
-
-### General Issues
-- **Port already in use** - Change `SERVER_PORT` in backend `.env`
-- **npm install fails** - Delete `node_modules` and `package-lock.json`, retry
-- **mvn build fails** - Run `mvn clean`, ensure Java 17+ is installed
+See [QUICK_START.md](QUICK_START.md#troubleshooting) and
+[ENV_CONFIGURATION.md](ENV_CONFIGURATION.md#common-issues).
 
 ## Contributing
 
-Contributions are welcome! Feel free to:
+Contributions are welcome:
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
+3. Commit your changes
+4. Push to your branch
 5. Open a Pull Request
 
-## Improvement Ideas
+## Ideas for further work
 
-- [ ] End-to-end encryption
+- [ ] Group chat end-to-end encryption (Sender Keys)
+- [ ] Safety-number / key-fingerprint verification (mitigate TOFU trust)
 - [ ] Message reactions/emojis
-- [ ] Voice and video calls
 - [ ] Message search
-- [ ] User blocking/muting
-- [ ] Message notifications
-- [ ] Dark mode
-- [ ] Message timestamps and read receipts
-- [ ] User profile pictures
+- [ ] Read receipts
 - [ ] File/image sharing
+- [ ] Voice and video calls
 
 ## License
 
-This project is open source and available under the MIT License.
-
-## Support
-
-If you encounter issues:
-1. Check [QUICK_START.md](QUICK_START.md)
-2. Review [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md)
-3. Read [DEPLOYMENT.md](DEPLOYMENT.md)
-4. Check GitHub issues
-5. Feel free to suggest improvements!
-
----
-
-**Happy Coding!** 🚀
-
-*This is a learning project - Contributions and suggestions are welcome!*
-👍👍
+MIT — this is a learning project. Contributions and suggestions are welcome.

@@ -1,137 +1,167 @@
 # Quick Start Guide
 
-Get the Chat App running in 5 minutes!
+Get the app running in a few minutes. Two paths: **Docker** (recommended,
+matches how the app is actually built and run) or **manual** (install each
+piece yourself).
 
-## Prerequisites
-- Java 17+
-- Node.js 16+
-- MySQL 8.0+
-- Maven 3.8+
+## Option A: Docker (recommended)
 
-## Step 1: Setup Database
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+### Steps
 
 ```bash
-# Connect to MySQL
-mysql -u root -p
+git clone <this-repo>
+cd Chat_app
 
-# In MySQL prompt:
+# 1. Root env (used by docker-compose for the JWT secret + MySQL root password)
+cp .env.example .env
+```
+
+Edit `.env` and set a real `JWT_SECRET_KEY`:
+```bash
+openssl rand -base64 32
+```
+(PowerShell equivalent: `[Convert]::ToBase64String((1..32 | ForEach-Object {Get-Random -Maximum 256}))`)
+
+```bash
+# 2. Build and start everything
+docker compose up -d --build
+```
+
+- **Frontend:** http://localhost:3000
+- **Backend:** http://localhost:5454
+- **MySQL:** localhost:3306 (root / whatever you set in `.env`)
+
+Check logs while it starts:
+```bash
+docker compose logs -f backend
+```
+
+Stop everything (keeps the MySQL data volume):
+```bash
+docker compose down
+```
+
+That's it — sign up, open a second browser (or incognito window) as a second
+user, and start a direct chat. See [docs/ENCRYPTION.md](docs/ENCRYPTION.md) for
+how to verify the messages are actually end-to-end encrypted.
+
+## Option B: Manual (no Docker)
+
+### Prerequisites
+- Java 17+
+- Node.js 18+
+- MySQL 8.0+
+- Maven 3.8+ (or use the included `mvnw` wrapper)
+
+### 1. Database
+
+```bash
+mysql -u root -p
+```
+```sql
 CREATE DATABASE whatsapp;
 CREATE USER 'chat_user'@'localhost' IDENTIFIED BY 'chat_password_123';
 GRANT ALL PRIVILEGES ON whatsapp.* TO 'chat_user'@'localhost';
 FLUSH PRIVILEGES;
-EXIT;
 ```
 
-## Step 2: Setup Backend
+### 2. Backend
 
 ```bash
 cd Backend
-
-# Create environment file
 cp .env.example .env
-
-# Edit .env with your database credentials
-# Default values should work for local development
-
-# Build the project
+# edit .env — at minimum set JWT_SECRET_KEY (32+ chars) and your DB credentials
 mvn clean package -DskipTests
-
-# Run the backend
 mvn spring-boot:run
 ```
+Backend runs at **http://localhost:5454**. Note: unlike some past versions of
+this project, there is **no fallback JWT secret** — the app refuses to start
+without `JWT_SECRET_KEY` set. This is intentional (see
+[ENV_CONFIGURATION.md](ENV_CONFIGURATION.md)).
 
-Backend will be running at: **http://localhost:5454**
-
-## Step 3: Setup Frontend
+### 3. Frontend
 
 ```bash
 cd FrontEnd/client
-
-# Install dependencies
 npm install
-
-# Create environment file
 cp .env.example .env.local
-
-# Start the development server
 npm start
 ```
+Frontend opens at **http://localhost:3000**.
 
-Frontend will open at: **http://localhost:3000**
+### 4. Try it
 
-## Step 4: Test the App
-
-1. Open **http://localhost:3000** in your browser
-2. Click "Sign Up" to create a new account
-3. Create another account in a different browser tab/incognito
-4. Start chatting between the two accounts!
+1. Open **http://localhost:3000**
+2. Sign up
+3. Sign up a second account in an incognito window (encryption keys are
+   per-browser-profile, so two real accounts need two separate profiles)
+4. Start a direct chat and send messages between them
 
 ## Troubleshooting
 
 ### Backend won't start
-```bash
-# Check if port 5454 is already in use
-lsof -i :5454
-
-# Test database connection
-mysql -u chat_user -p -h localhost whatsapp
-```
+- **"required property 'JWT_SECRET_KEY' not found"** — set it in `Backend/.env`
+  (manual) or the root `.env` (Docker). See above.
+- **Port 5454 in use:**
+  ```bash
+  # Windows (PowerShell)
+  Get-NetTCPConnection -LocalPort 5454
+  # macOS/Linux
+  lsof -i :5454
+  ```
+- **Database connection error** — confirm MySQL is running and the credentials
+  in `Backend/.env` are correct.
 
 ### Frontend won't connect to backend
-- Check if backend is running: `http://localhost:5454`
 - Check `REACT_APP_API_BASE_URL` in `FrontEnd/client/.env.local`
-- Check browser console for errors (F12)
+- Check the browser console (F12) for errors
+- If running via Docker, the frontend and backend are separate containers —
+  confirm both are `Up`: `docker compose ps`
 
-### Database connection error
-- Verify MySQL is running
-- Check credentials in `Backend/.env`
-- Ensure database `whatsapp` exists
+### "Nothing happens" when sending a message
+- Open devtools → Console. Signal key generation runs once per new
+  browser/account and can take a moment; check for errors there first.
+- Confirm the WebSocket connected — look for `WebSocket connected` in the console.
+
+### Docker-specific
+- **`docker compose up` hangs on mysql** — first boot can take ~30–60s while
+  MySQL initializes; the backend waits for a healthcheck before starting.
+- **Rebuilding after a code change:** `docker compose up -d --build <service>`
+  (e.g. `frontend` or `backend`) rebuilds just that service.
 
 ## What's Next?
 
-- Read [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md) for detailed configuration options
-- Read [DEPLOYMENT.md](DEPLOYMENT.md) for production deployment instructions
-- Check [.gitignore files](.gitignore) for what's excluded from git
-
-## Project Structure
-
-```
-Chat_app/
-├── Backend/          # Spring Boot API
-│   ├── src/
-│   ├── pom.xml
-│   └── .env.example
-├── FrontEnd/client/  # React App
-│   ├── src/
-│   ├── package.json
-│   └── .env.example
-├── DEPLOYMENT.md     # Production deployment guide
-└── ENV_CONFIGURATION.md  # Environment variables guide
-```
-
-## Tips
-
-💡 **Development Tip**: Keep two terminal windows open:
-- Terminal 1: `cd Backend && mvn spring-boot:run`
-- Terminal 2: `cd FrontEnd/client && npm start`
-
-🔒 **Security Note**: Never commit `.env` files with real credentials. Use `.env.example` as template.
+- [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md) — every environment variable explained
+- [DEPLOYMENT.md](DEPLOYMENT.md) — running this somewhere other than localhost
+- [docs/ENCRYPTION.md](docs/ENCRYPTION.md) — how the end-to-end encryption works
 
 ## Common Commands
 
+### Docker
 ```bash
-# Backend
-mvn clean package          # Build backend
-mvn spring-boot:run       # Run backend
-mvn test                  # Run tests
+docker compose up -d --build     # build + start everything
+docker compose logs -f backend   # tail backend logs
+docker compose down              # stop (keeps DB volume)
+docker compose down -v           # stop and WIPE the DB volume
+```
 
-# Frontend
-npm install               # Install dependencies
-npm start                 # Development server
-npm build                 # Production build
-npm test                  # Run tests
+### Backend (manual)
+```bash
+mvn clean package     # build
+mvn spring-boot:run   # run
+mvn test               # run tests
+```
+
+### Frontend (manual)
+```bash
+npm install    # install dependencies
+npm start      # dev server
+npm run build  # production build
 ```
 
 ---
 
-**Happy Coding!** 🚀
+**Happy coding!**

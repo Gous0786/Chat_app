@@ -1,574 +1,165 @@
-# Chat App - Deployment Guide
+# Deployment Guide
 
-This document provides step-by-step instructions for deploying the Chat Application (Backend + Frontend).
+This app ships as three Docker services (`docker-compose.yml`): MySQL,
+Spring Boot backend, and an nginx-served React build. Any deployment target
+just needs to run those three pieces — the compose file is the reference.
 
-## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [Environment Setup](#environment-setup)
-3. [Backend Deployment](#backend-deployment)
-4. [Frontend Deployment](#frontend-deployment)
-5. [Database Setup](#database-setup)
-6. [Production Deployment](#production-deployment)
-7. [Troubleshooting](#troubleshooting)
+## ⚠️ HTTPS is not optional
 
----
+**End-to-end encryption requires a secure browser context.** The frontend uses
+the Web Crypto API (`crypto.subtle`) to run the Signal Protocol, and browsers
+refuse to expose it outside `https://` or `localhost`. If you deploy this app
+over plain `http://`, encryption key generation will silently fail.
 
-## Prerequisites
+This means, unlike a typical "get it online" checklist, **TLS is a functional
+requirement here, not a nice-to-have**. Every option below either gives you
+HTTPS automatically or is called out where it doesn't.
 
-### Required Software
-- **Java 17** or higher - [Download](https://www.oracle.com/java/technologies/downloads/)
-- **Node.js 16+** and npm - [Download](https://nodejs.org/)
-- **MySQL 8.0+** - [Download](https://dev.mysql.com/downloads/mysql/)
-- **Maven 3.8+** (for Backend) - [Download](https://maven.apache.org/download.cgi)
-- **Git** - [Download](https://git-scm.com/)
+## Choosing a target
 
-### Verify Installation
-```bash
-# Check Java version
-java -version
-
-# Check Node and npm
-node --version
-npm --version
-
-# Check Maven
-mvn --version
-
-# Check MySQL
-mysql --version
-```
+| You want... | Use |
+|---|---|
+| A free demo/portfolio link, don't mind occasional cold starts | [Render](#option-1-render--vercel-free-demo) + Vercel |
+| A permanently free, always-on box you fully control | [Oracle Cloud Free Tier](#option-2-oracle-cloud-always-free-vm) |
+| The absolute least effort, small ongoing cost | [Railway](#option-3-railway-paid-easiest) |
+| To self-host on your own hardware | [Self-hosting](#option-4-self-hosting-your-own-machine) |
 
 ---
 
-## Environment Setup
-
-### 1. Backend Environment Configuration
-
-Create a `.env` file in the `Backend/` directory:
-
-```bash
-cd Backend
-cp .env.example .env
-```
-
-Edit `Backend/.env` with your actual values:
-
-```env
-# Server Configuration
-SPRING_APPLICATION_NAME=Web
-SERVER_PORT=5454
-
-# Database Configuration (IMPORTANT: Change these for production)
-SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/whatsapp
-SPRING_DATASOURCE_USERNAME=your_db_username
-SPRING_DATASOURCE_PASSWORD=your_secure_db_password
-
-# JWT Secret Key (IMPORTANT: Generate a strong secure key)
-JWT_SECRET_KEY=generate_a_strong_random_key_at_least_32_characters_long
-
-# Hibernate Configuration
-SPRING_JPA_HIBERNATE_DDL_AUTO=update  # Use 'validate' in production
-SPRING_JPA_SHOW_SQL=false
-
-# Environment
-SPRING_PROFILES_ACTIVE=prod
-```
-
-### 2. Frontend Environment Configuration
-
-Create a `.env` file in the `FrontEnd/client/` directory:
-
-```bash
-cd FrontEnd/client
-cp .env.example .env.local
-```
-
-Edit `FrontEnd/client/.env.local` with your backend URL:
-
-```env
-REACT_APP_API_BASE_URL=http://your_backend_url:5454
-REACT_APP_ENV=production
-```
-
-### 3. Update Backend Configuration File
-
-The backend also uses `src/main/resources/application.properties`. You can either:
-
-**Option A**: Keep using environment variables (recommended for Docker/Cloud deployments)
-
-**Option B**: Update `application.properties` directly:
-```properties
-spring.application.name=Web
-server.port=5454
-spring.datasource.url=jdbc:mysql://your_db_host:3306/whatsapp
-spring.datasource.username=your_username
-spring.datasource.password=your_password
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=false
-```
-
----
-
-## Database Setup
-
-### 1. Create MySQL Database
-
-```bash
-# Connect to MySQL
-mysql -u root -p
-
-# Create database and user
-CREATE DATABASE whatsapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'chat_user'@'localhost' IDENTIFIED BY 'strong_password_123';
-GRANT ALL PRIVILEGES ON whatsapp.* TO 'chat_user'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
-
-### 2. Verify Database Connection
-
-```bash
-mysql -u chat_user -p whatsapp
-SHOW TABLES;
-```
-
-The tables will be created automatically when you first run the application (due to `spring.jpa.hibernate.ddl-auto=update`).
-
----
-
-## Backend Deployment
-
-### 1. Build the Backend
-
-```bash
-cd Backend
-
-# Clean previous builds
-mvn clean
-
-# Build the project
-mvn package -DskipTests
-
-# Output: target/Web-0.0.1-SNAPSHOT.jar
-```
-
-### 2. Run the Backend (Development)
-
-```bash
-cd Backend
-
-# Option 1: Using Maven
-mvn spring-boot:run
-
-# Option 2: Using Java directly
-java -jar target/Web-0.0.1-SNAPSHOT.jar
-```
-
-The application will start on `http://localhost:5454`
-
-### 3. Verify Backend is Running
-
-```bash
-# Check if port 5454 is listening
-curl http://localhost:5454/
-
-# Or test an API endpoint
-curl http://localhost:5454/api/home/
-```
-
----
-
-## Frontend Deployment
-
-### 1. Install Dependencies
-
-```bash
-cd FrontEnd/client
-
-# Install npm packages
-npm install
-```
-
-### 2. Build the Frontend (Production)
-
-```bash
-npm run build
-
-# Output: build/ directory
-```
-
-### 3. Run Frontend (Development)
-
-```bash
-npm start
-
-# Application will open at http://localhost:3000
-```
-
-### 4. Verify Frontend is Working
-
-- Navigate to `http://localhost:3000` in your browser
-- The app should load and connect to the backend API
-
----
-
-## Production Deployment
-
-### Option 1: Manual Server Deployment (Ubuntu/Linux)
-
-#### Backend Setup
-
-```bash
-# 1. SSH into your server
-ssh user@your_server_ip
-
-# 2. Install Java and MySQL
-sudo apt update
-sudo apt install openjdk-17-jdk mysql-server
-
-# 3. Clone repository
-git clone https://github.com/yourusername/Chat_app.git
-cd Chat_app/Backend
-
-# 4. Create production .env
-nano .env
-# Add your production configuration
-
-# 5. Build
-mvn clean package -DskipTests
-
-# 6. Create systemd service file (optional)
-sudo nano /etc/systemd/system/chat-backend.service
-```
-
-Add this content:
-```ini
-[Unit]
-Description=Chat App Backend
-After=network.target
-
-[Service]
-Type=simple
-User=chatapp
-WorkingDirectory=/home/chatapp/Chat_app/Backend
-ExecStart=/usr/bin/java -jar target/Web-0.0.1-SNAPSHOT.jar
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Then run:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl start chat-backend
-sudo systemctl enable chat-backend
-sudo systemctl status chat-backend
-```
-
-#### Frontend Setup (Nginx)
-
-```bash
-# 1. Install Nginx
-sudo apt install nginx
-
-# 2. Build frontend
-cd /home/chatapp/Chat_app/FrontEnd/client
-npm install
-npm run build
-
-# 3. Configure Nginx
-sudo nano /etc/nginx/sites-available/chat-app
-```
-
-Add this content:
-```nginx
-server {
-    listen 80;
-    server_name your_domain.com;
-
-    location / {
-        root /home/chatapp/Chat_app/FrontEnd/client/build;
-        try_files $uri /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://localhost:5454;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Enable and restart Nginx:
-```bash
-sudo ln -s /etc/nginx/sites-available/chat-app /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
----
-
-### Option 2: Docker Deployment (Recommended)
-
-Create `Backend/Dockerfile`:
-```dockerfile
-FROM openjdk:17-jdk-slim
-
-WORKDIR /app
-
-COPY target/Web-0.0.1-SNAPSHOT.jar app.jar
-
-EXPOSE 5454
-
-CMD ["java", "-jar", "app.jar"]
-```
-
-Create `FrontEnd/client/Dockerfile`:
-```dockerfile
-FROM node:18-alpine AS build
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-Create `docker-compose.yml` in root:
-```yaml
-version: '3.8'
-
-services:
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: whatsapp
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-
-  backend:
-    build:
-      context: ./Backend
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/whatsapp
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
-      JWT_SECRET_KEY: your_secure_key_here
-    ports:
-      - "5454:5454"
-    depends_on:
-      - mysql
-
-  frontend:
-    build:
-      context: ./FrontEnd/client
-    environment:
-      REACT_APP_API_BASE_URL: http://localhost:5454
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
-
-volumes:
-  mysql_data:
-```
-
-Deploy with Docker:
-```bash
-docker-compose up -d
-```
-
----
-
-### Option 3: Cloud Deployment (AWS/GCP/Azure)
-
-#### AWS Elastic Beanstalk
-
-1. **Backend Setup**:
-```bash
-cd Backend
-eb init -p java-17 chat-backend
-eb create chat-backend-env
-eb deploy
-```
-
-2. **Configure Environment Variables**:
-```bash
-eb setenv SPRING_DATASOURCE_URL=your_rds_url
-eb setenv JWT_SECRET_KEY=your_secure_key
-```
-
-3. **Frontend Setup**:
-```bash
-cd FrontEnd/client
-npm run build
-aws s3 sync build/ s3://your-bucket-name/
-```
-
----
-
-## Environment Variables Configuration
-
-### Critical Security Notes
-
-⚠️ **NEVER commit `.env` files with actual credentials to Git!**
-
-- `JWT_SECRET_KEY`: Generate a strong random string. Example:
-  ```bash
-  openssl rand -base64 32
-  ```
-
-- `SPRING_DATASOURCE_PASSWORD`: Use a strong password:
-  ```bash
-  openssl rand -base64 16
-  ```
-
-- For production, use your platform's secret management:
-  - AWS Secrets Manager
-  - GCP Secret Manager
-  - Azure Key Vault
-  - HashiCorp Vault
+## Option 1: Render + Vercel (free demo)
+
+Good for a portfolio link. **Caveats:** Render's free web services sleep after
+~15 minutes of inactivity (first request after sleeping takes 30–60s to wake),
+and Render's own free database has a ~30-day expiry — use a free external
+MySQL instead (e.g. [Aiven](https://aiven.io)) to avoid recreating it monthly.
+
+1. **Database** — create a free MySQL instance (Aiven or similar). Note the
+   host, port, username, password.
+2. **Backend** on [Render](https://render.com):
+   - New → Web Service → connect this repo, root directory `Backend`
+   - Environment: **Docker** (it will use `Backend/Dockerfile`)
+   - Environment variables:
+     ```
+     SPRING_DATASOURCE_URL=jdbc:mysql://<your-mysql-host>:<port>/whatsapp
+     SPRING_DATASOURCE_USERNAME=<user>
+     SPRING_DATASOURCE_PASSWORD=<password>
+     JWT_SECRET_KEY=<openssl rand -base64 32>
+     SPRING_JPA_HIBERNATE_DDL_AUTO=update
+     ```
+   - Render provisions HTTPS automatically — note the `https://…onrender.com` URL
+3. **Frontend** on [Vercel](https://vercel.com):
+   - Import this repo, set the root directory to `FrontEnd/client`
+   - Build command: `npm run build`, output directory: `build`
+   - Environment variable: `REACT_APP_API_BASE_URL=https://<your-render-backend-url>`
+   - Vercel provisions HTTPS automatically
+
+## Option 2: Oracle Cloud Always-Free VM
+
+The most generous permanently-free option: an always-free ARM VM (4 CPUs,
+24GB RAM at time of writing) where you run the existing `docker-compose.yml`
+as-is, no sleeping, no expiring database. More setup than Option 1 — you
+manage the server and its TLS certificate yourself.
+
+1. Sign up at [oracle.com/cloud/free](https://www.oracle.com/cloud/free/) (requires a card; the Always Free tier itself doesn't charge)
+2. Create an Ampere (ARM) compute instance, Ubuntu 22.04, Always Free shape
+3. SSH in, install Docker:
+   ```bash
+   sudo apt update && sudo apt install -y docker.io docker-compose-plugin
+   sudo usermod -aG docker $USER
+   ```
+4. Clone the repo, set up `.env` as in [QUICK_START.md](QUICK_START.md), then:
+   ```bash
+   docker compose up -d --build
+   ```
+5. **Put a reverse proxy with TLS in front of it.** The simplest option is
+   [Caddy](https://caddyserver.com/) — it gets a free Let's Encrypt certificate
+   automatically for a domain you point at the VM:
+   ```
+   your-domain.com {
+       reverse_proxy /api/* localhost:5454
+       reverse_proxy /auth/* localhost:5454
+       reverse_proxy /websocket localhost:5454
+       reverse_proxy localhost:3000
+   }
+   ```
+6. Open ports 80/443 in the Oracle Cloud instance's security list.
+7. Rebuild the frontend with `REACT_APP_API_BASE_URL=https://your-domain.com`
+   so it calls the proxy, not `localhost:5454` directly.
+
+## Option 3: Railway (paid, easiest)
+
+Railway no longer has a meaningful free tier, but it's the least amount of
+manual work if you don't mind a small monthly cost (~$5): connect the repo, it
+detects the `docker-compose.yml`/Dockerfiles, add a MySQL plugin, set the same
+environment variables as Option 1, deploy. HTTPS is automatic on the generated
+domain.
+
+## Option 4: Self-hosting (your own machine)
+
+If you have hardware that can stay powered on, this is genuinely the best
+long-term option — no free-tier limits, no sleeping, full control, and it's
+the exact `docker-compose.yml` you already have.
+
+1. Install Docker on the machine.
+2. Clone the repo, set up `.env`.
+3. `docker compose up -d --build`.
+4. **Get HTTPS**: the easiest path is [Caddy](https://caddyserver.com/) (see
+   the Oracle Cloud steps above) or a tunnel service like
+   [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+   / [Tailscale Funnel](https://tailscale.com/kb/1223/funnel), which both give
+   you a public HTTPS URL without opening ports on your router.
+5. If your ISP gives you a dynamic IP, pair this with a dynamic DNS service, or
+   use one of the tunnel options above (they don't need a static IP at all).
 
 ---
 
 ## Production Checklist
 
-- [ ] Change all default passwords
-- [ ] Generate strong JWT secret key
-- [ ] Set `spring.jpa.hibernate.ddl-auto=validate`
-- [ ] Disable `spring.jpa.show-sql`
-- [ ] Use HTTPS/SSL certificates (Let's Encrypt)
-- [ ] Set up database backups
-- [ ] Configure monitoring and logging
-- [ ] Set up CI/CD pipeline
-- [ ] Update CORS configuration for production domain
-- [ ] Implement rate limiting
-- [ ] Set up firewall rules
-- [ ] Enable database connection pooling
+- [ ] `JWT_SECRET_KEY` is a freshly generated 32+ character secret (not a value
+      that ever appeared in this repo's git history)
+- [ ] Database password is not `root`/`root`
+- [ ] `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` once the schema is stable (see
+      the migration note in [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md) — you
+      may need one manual `ALTER TABLE` first if migrating an existing DB)
+- [ ] `SPRING_JPA_SHOW_SQL=false`
+- [ ] Serving over **HTTPS** (required for encryption — see above) and the
+      WebSocket accordingly upgrades to `wss://` automatically once the page is
+      loaded over HTTPS
+- [ ] `REACT_APP_API_BASE_URL` points at the real HTTPS backend URL
+- [ ] Database backups configured (`mysqldump` on a schedule, or your host's
+      managed backup feature)
+- [ ] CORS origin in `AppConfig.java` matches your real frontend domain (it's
+      currently set for local development)
 
----
-
-## Troubleshooting
-
-### Backend Issues
-
-**Port already in use**:
-```bash
-# Find process using port 5454
-lsof -i :5454
-# Kill the process
-kill -9 <PID>
-```
-
-**Database connection error**:
-```bash
-# Check MySQL is running
-mysql -u root -p -e "SELECT 1;"
-
-# Verify credentials in .env
-cat Backend/.env
-```
-
-**JWT secret key too short**:
-- Generate a new one: `openssl rand -base64 32`
-- Update in `.env`
-
-### Frontend Issues
-
-**CORS error**:
-- Update backend CORS configuration
-- Ensure `REACT_APP_API_BASE_URL` matches backend URL
-
-**Blank page or 404**:
-- Check frontend build completed: `ls FrontEnd/client/build/`
-- Verify API endpoint in browser console
-- Check Nginx configuration
-
-**WebSocket connection fails**:
-- Ensure WebSocket upgrade is allowed in proxy
-- Check firewall rules
-
----
-
-## Monitoring & Logs
-
-### View Backend Logs
-
-```bash
-# If using systemd
-sudo journalctl -u chat-backend -f
-
-# If running directly
-tail -f logs/application.log
-```
-
-### View Frontend Logs
-
-```bash
-# Browser console (press F12)
-# Check Network tab for API calls
-```
-
-### Database Logs
-
-```bash
-# MySQL slow query log
-tail -f /var/log/mysql/slow.log
-```
-
----
-
-## Backup & Recovery
-
-### Database Backup
+## Database Backup & Restore
 
 ```bash
 # Backup
-mysqldump -u root -p whatsapp > backup.sql
+docker exec chat_app-mysql-1 mysqldump -uroot -p<password> whatsapp > backup.sql
 
 # Restore
-mysql -u root -p whatsapp < backup.sql
+docker exec -i chat_app-mysql-1 mysql -uroot -p<password> whatsapp < backup.sql
 ```
 
-### Application Backup
+## Troubleshooting
 
-```bash
-# Backup JAR and configs
-tar -czf backup_$(date +%Y%m%d).tar.gz Backend/target/ FrontEnd/client/build/
-```
+**CORS errors** — the backend's allowed origin is configured in
+`Backend/src/main/java/com/whatsapp/Web/config/AppConfig.java`; update it to
+match your deployed frontend URL.
+
+**WebSocket fails behind a reverse proxy** — make sure your proxy config
+upgrades `Connection`/`Upgrade` headers for the `/websocket` path (the Caddy
+and nginx examples above already do this correctly for their respective tools).
+
+**Encryption silently doesn't initialize** — you're very likely serving over
+plain HTTP. Confirm the address bar shows `https://` (or you're on `localhost`).
+
+**JWT secret errors** — see [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md#jwt).
 
 ---
 
-## Additional Resources
+## Related Documentation
 
-- Spring Boot Documentation: https://spring.io/projects/spring-boot
-- React Documentation: https://react.dev
-- MySQL Documentation: https://dev.mysql.com/doc/
-- JWT Documentation: https://jwt.io/
-- Docker Documentation: https://docs.docker.com/
-
----
-
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section
-2. Review application logs
-3. Verify environment configuration
-4. Check GitHub issues: [your-repo-url]/issues
+- [QUICK_START.md](QUICK_START.md) — local development setup
+- [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md) — every environment variable explained
+- [docs/ENCRYPTION.md](docs/ENCRYPTION.md) — why HTTPS matters for this app specifically

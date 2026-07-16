@@ -1,288 +1,164 @@
 # Environment Configuration Guide
 
-This guide explains all environment variables used in the Chat Application and how to configure them.
+This project has **three** `.env` files, one per place that needs configuration:
+
+| File | Used by | Copy from |
+|---|---|---|
+| `Backend/.env` | Spring Boot (manual/non-Docker runs) | `Backend/.env.example` |
+| `FrontEnd/client/.env.local` | Create React App (manual/non-Docker runs) | `FrontEnd/client/.env.example` |
+| `.env` (repo root) | `docker-compose.yml` | `.env.example` (repo root) |
+
+All three are gitignored — never commit real secrets.
 
 ## Quick Start
 
-### 1. Backend Setup
-
+### Docker (recommended)
 ```bash
-cd Backend
 cp .env.example .env
+# edit .env: set JWT_SECRET_KEY
+docker compose up -d --build
 ```
+The compose file wires `SPRING_DATASOURCE_URL` etc. to the `mysql` container for
+you — you don't set those yourself for Docker runs.
 
-Edit `.env` with your values:
-```env
-SPRING_APPLICATION_NAME=Web
-SERVER_PORT=5454
-SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/whatsapp
-SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
-SPRING_DATASOURCE_USERNAME=your_username
-SPRING_DATASOURCE_PASSWORD=your_password
-JWT_SECRET_KEY=your_secure_key_min_32_chars
-JWT_EXPIRATION_TIME=85400000
-SPRING_JPA_HIBERNATE_DDL_AUTO=update
-SPRING_JPA_SHOW_SQL=false
-SPRING_PROFILES_ACTIVE=dev
-```
-
-### 2. Frontend Setup
-
+### Manual (no Docker)
 ```bash
-cd FrontEnd/client
-cp .env.example .env.local
-```
-
-Edit `.env.local`:
-```env
-REACT_APP_API_BASE_URL=http://localhost:5454
+cd Backend && cp .env.example .env       # edit with your local DB creds + JWT secret
+cd ../FrontEnd/client && cp .env.example .env.local
 ```
 
 ---
 
-## Backend Environment Variables
+## Root `.env` (docker-compose only)
 
-### Server Configuration
+| Variable | Default | Purpose |
+|---|---|---|
+| `JWT_SECRET_KEY` | *(none — required)* | Signs/validates JWTs. **The app refuses to start without this set.** Generate with `openssl rand -base64 32`. |
+| `MYSQL_ROOT_PASSWORD` | `root` | Root password for the MySQL container. |
 
-| Variable | Default | Purpose | Example |
-|----------|---------|---------|---------|
-| `SPRING_APPLICATION_NAME` | `Web` | Application name | `Web` |
-| `SERVER_PORT` | `5454` | Server port | `5454` |
-| `SPRING_PROFILES_ACTIVE` | `dev` | Active profile (dev/prod) | `prod` |
+These two values are injected into the `backend` and `mysql` services by
+`docker-compose.yml`; you don't need to set `SPRING_DATASOURCE_URL` etc.
+yourself for a Docker run — compose points the backend at the `mysql` service
+by hostname already.
 
-### Database Configuration
+---
 
-| Variable | Default | Purpose | Example |
-|----------|---------|---------|---------|
-| `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3306/whatsapp` | Database URL | `jdbc:mysql://db.example.com:3306/whatsapp` |
-| `SPRING_DATASOURCE_DRIVER_CLASS_NAME` | `com.mysql.cj.jdbc.Driver` | JDBC Driver | `com.mysql.cj.jdbc.Driver` |
-| `SPRING_DATASOURCE_USERNAME` | `root` | Database username | `chat_user` |
-| `SPRING_DATASOURCE_PASSWORD` | `root` | Database password | `secure_password_123` |
+## Backend Environment Variables (`Backend/.env`, manual runs only)
 
-**Security Warning**: Never use default credentials in production!
+### Server
 
-### Hibernate Configuration
+| Variable | Default | Purpose |
+|---|---|---|
+| `SPRING_APPLICATION_NAME` | `Web` | Application name |
+| `SERVER_PORT` | `5454` | HTTP port |
 
-| Variable | Default | Purpose | Values |
-|----------|---------|---------|--------|
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `update` | Schema auto-generation | `create`, `create-drop`, `update`, `validate` |
-| `SPRING_JPA_SHOW_SQL` | `true` | Log SQL queries | `true`, `false` |
+### Database
 
-**Schema Auto-generation Guide**:
-- **Development**: `update` (auto-creates/updates tables)
-- **Production**: `validate` (validates schema only, no changes)
-- **Testing**: `create-drop` (creates and drops schema on startup/shutdown)
+| Variable | Default | Purpose |
+|---|---|---|
+| `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3306/whatsapp` | JDBC connection string |
+| `SPRING_DATASOURCE_DRIVER_CLASS_NAME` | `com.mysql.cj.jdbc.Driver` | JDBC driver |
+| `SPRING_DATASOURCE_USERNAME` | `root` | DB username |
+| `SPRING_DATASOURCE_PASSWORD` | `root` | DB password |
 
-### JWT Configuration
+**Never use `root`/`root` outside local development.**
 
-| Variable | Default | Purpose | Notes |
-|----------|---------|---------|-------|
-| `JWT_SECRET_KEY` | `qegfghsdfgrtsubyjtynrbevthgvgsrthv` | Secret key for signing tokens | **Must be at least 32 characters!** |
-| `JWT_EXPIRATION_TIME` | `85400000` | Token expiration in milliseconds | Default = ~24 hours |
+### Hibernate
 
-**Generate Secure JWT Secret**:
+| Variable | Default | Purpose |
+|---|---|---|
+| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `update` | Schema management: `update` auto-adds columns/tables but **will not widen an existing column type** (e.g. `VARCHAR` → `TEXT`) — see the note below. Use `validate` in a real production deployment once the schema is stable. |
+| `SPRING_JPA_SHOW_SQL` | `true` | Log SQL statements. Set `false` in production. |
+
+> **Schema migration note:** this project has run at least one migration that
+> `ddl-auto=update` cannot apply automatically — widening `message.content`
+> from `VARCHAR(255)` to `TEXT` to hold encrypted message envelopes. If you're
+> upgrading an existing database rather than starting fresh, run once:
+> ```sql
+> ALTER TABLE message MODIFY COLUMN content TEXT;
+> ```
+> A fresh database (new Docker volume, or a new `CREATE DATABASE`) doesn't need
+> this — Hibernate creates the column correctly from the start.
+
+### JWT
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `JWT_SECRET_KEY` | *(none — required)* | **No fallback.** The app fails to start without this set, by design — an earlier version of this project shipped with a hardcoded fallback secret, which is a real security hole (anyone who read the source could forge tokens). Must be 32+ characters. |
+| `JWT_EXPIRATION_TIME` | `85400000` | Token lifetime in milliseconds (~24 hours). |
+
+Generate a secret:
 ```bash
-# Linux/Mac
+# Linux/macOS
 openssl rand -base64 32
 
 # Windows PowerShell
 [Convert]::ToBase64String((1..32 | ForEach-Object {Get-Random -Maximum 256}))
 ```
 
-### Logging Configuration
-
-| Variable | Default | Purpose | Values |
-|----------|---------|---------|--------|
-| `LOGGING_LEVEL_ROOT` | `INFO` | Root logging level | `DEBUG`, `INFO`, `WARN`, `ERROR` |
-| `LOGGING_LEVEL_COM_WHATSAPP` | `DEBUG` | App logging level | `DEBUG`, `INFO`, `WARN`, `ERROR` |
-
 ---
 
-## Frontend Environment Variables
+## Frontend Environment Variables (`FrontEnd/client/.env.local`)
 
-### API Configuration
+| Variable | Default | Purpose |
+|---|---|---|
+| `REACT_APP_API_BASE_URL` | `http://localhost:5454` | Base URL for REST calls **and** the WebSocket (`${REACT_APP_API_BASE_URL}/websocket`). Set this to your deployed backend's HTTPS URL in production — see [DEPLOYMENT.md](DEPLOYMENT.md) for why HTTPS specifically matters here (the Signal encryption library requires a secure browser context). |
 
-| Variable | Default | Purpose | Example |
-|----------|---------|---------|---------|
-| `REACT_APP_API_BASE_URL` | `http://localhost:5454` | Backend API URL | `http://api.example.com` |
-| `REACT_APP_ENV` | `development` | Environment type | `development`, `production` |
-| `REACT_APP_SOCKET_URL` | `http://localhost:5454` | WebSocket URL | `ws://api.example.com` |
-
-**Important**: 
-- Frontend env variables must be prefixed with `REACT_APP_`
-- Changes require rebuilding the app
-- `.env.local` is not committed to git
-
----
-
-## Database Configuration Examples
-
-### Local Development
-```env
-SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/whatsapp
-SPRING_DATASOURCE_USERNAME=root
-SPRING_DATASOURCE_PASSWORD=root
-```
-
-### Remote MySQL Server
-```env
-SPRING_DATASOURCE_URL=jdbc:mysql://db.example.com:3306/whatsapp
-SPRING_DATASOURCE_USERNAME=chat_user
-SPRING_DATASOURCE_PASSWORD=SecurePassword123!
-```
-
-### AWS RDS
-```env
-SPRING_DATASOURCE_URL=jdbc:mysql://whatsapp-db.xxxxx.us-east-1.rds.amazonaws.com:3306/whatsapp
-SPRING_DATASOURCE_USERNAME=admin
-SPRING_DATASOURCE_PASSWORD=YourRDSPassword123!
-```
-
-### Docker MySQL
-```env
-SPRING_DATASOURCE_URL=jdbc:mysql://mysql-container:3306/whatsapp
-SPRING_DATASOURCE_USERNAME=root
-SPRING_DATASOURCE_PASSWORD=root_password
-```
-
----
-
-## Profile-Specific Configuration
-
-### Development Profile (`dev`)
-
-Set `SPRING_PROFILES_ACTIVE=dev` and create `application-dev.properties`:
-```properties
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-logging.level.root=DEBUG
-logging.level.com.whatsapp=DEBUG
-```
-
-### Production Profile (`prod`)
-
-Set `SPRING_PROFILES_ACTIVE=prod` (uses `application-prod.properties`):
-```properties
-spring.jpa.hibernate.ddl-auto=validate
-spring.jpa.show-sql=false
-logging.level.root=INFO
-logging.level.com.whatsapp=INFO
-```
-
----
-
-## How to Run with Different Configurations
-
-### Development
-
-```bash
-# Using Maven
-mvn spring-boot:run
-
-# Using JAR with dev profile
-java -Dspring.profiles.active=dev -jar Web-0.0.1-SNAPSHOT.jar
-```
-
-### Production
-
-```bash
-# Using environment variables
-export SPRING_DATASOURCE_USERNAME=prod_user
-export SPRING_DATASOURCE_PASSWORD=prod_password
-export JWT_SECRET_KEY=your_production_secret_key
-
-java -Dspring.profiles.active=prod -jar Web-0.0.1-SNAPSHOT.jar
-```
-
-### Docker
-
-```bash
-docker run -e SPRING_DATASOURCE_URL="jdbc:mysql://mysql:3306/whatsapp" \
-           -e SPRING_DATASOURCE_USERNAME="root" \
-           -e SPRING_DATASOURCE_PASSWORD="root" \
-           -e JWT_SECRET_KEY="your_secret_key" \
-           -e SPRING_PROFILES_ACTIVE=prod \
-           -p 5454:5454 \
-           chat-app:latest
-```
+Notes:
+- Frontend env vars must be prefixed `REACT_APP_` (a Create React App requirement).
+- Changes require a rebuild (`npm start` restart, or `npm run build` / a Docker rebuild).
+- There is no separate WebSocket URL variable — the socket URL is derived from
+  `REACT_APP_API_BASE_URL`.
 
 ---
 
 ## Security Best Practices
 
-### ✅ DO:
-- Generate strong JWT secret keys (use `openssl rand -base64 32`)
-- Use strong database passwords
-- Use environment variables for sensitive data
-- Never commit `.env` files to Git
-- Use HTTPS in production
-- Rotate JWT secrets periodically
-- Use database connection pooling
+**Do:**
+- Generate a strong JWT secret (`openssl rand -base64 32`) and keep it out of git
+- Use a unique database password outside local dev
+- Use HTTPS/WSS in any real deployment (required for the encryption to initialize at all)
+- Rotate the JWT secret periodically
 
-### ❌ DON'T:
-- Use default passwords (root/root)
-- Commit secrets to version control
-- Use weak JWT secrets
-- Expose database credentials in logs
-- Use `create` or `update` in production Hibernate settings
-- Enable SQL logging in production
-- Trust client-side environment variables
+**Don't:**
+- Commit `.env`, `.env.local`, or any file with real credentials
+- Reuse the `root`/`root` MySQL defaults anywhere but local dev
+- Set `ddl-auto=update` (or `create`) against a production database you care about
+- Assume a missing `JWT_SECRET_KEY` will fall back to something safe — it won't start at all
 
 ---
 
 ## Common Issues
 
-### JWT Secret Key Too Short
-**Error**: `java.lang.IllegalArgumentException: Key size must be at least...`
+### "Required property 'JWT_SECRET_KEY' not found" / app won't start
+Set `JWT_SECRET_KEY` in `Backend/.env` (manual) or the root `.env` (Docker). This
+is intentional — the app has no fallback secret.
 
-**Fix**: Generate a proper 32+ character key
-```bash
-openssl rand -base64 32
+### JWT secret key too short
 ```
-
-### Database Connection Refused
-**Error**: `Connection refused` or `Cannot get a connection`
-
-**Check**:
-1. MySQL is running
-2. Correct host/port in `SPRING_DATASOURCE_URL`
-3. Username/password are correct
-4. Database exists
-
-```bash
-mysql -h your_host -u your_user -p
+java.lang.IllegalArgumentException: Key size must be at least...
 ```
+Generate a proper 32+ character key (see above).
 
-### CORS Errors in Frontend
-**Error**: `No 'Access-Control-Allow-Origin'`
+### Database connection refused
+1. Confirm MySQL is running (`docker compose ps` if using Docker)
+2. Confirm host/port in `SPRING_DATASOURCE_URL`
+3. Confirm username/password
+4. Confirm the database exists
 
-**Fix**: Ensure `REACT_APP_API_BASE_URL` matches your backend URL and CORS is enabled.
+### CORS errors in the frontend
+Confirm `REACT_APP_API_BASE_URL` matches where the backend actually runs.
 
-### Environment Variables Not Loaded
-**Fix**: 
-1. Ensure `.env` file is in the correct directory
-2. Restart the application
-3. Use `System.getenv()` to verify in code
-
----
-
-## Verification Checklist
-
-After setting up environment variables:
-
-- [ ] Backend starts without errors
-- [ ] Database connection successful
-- [ ] JWT tokens are generated correctly
-- [ ] Frontend loads API URL correctly
-- [ ] Authentication works (signup/login)
-- [ ] Chat functionality works
-- [ ] No sensitive data in logs
+### Encryption doesn't seem to work / keys never generate
+Open devtools → Console for errors from `src/signal/*`. The most common cause
+in production is **not running over HTTPS** — the browser's Web Crypto API
+silently requires a secure context (`localhost` counts as one; a plain `http://`
+production domain does not).
 
 ---
 
 ## Additional Resources
 
-- [Spring Boot Properties](https://docs.spring.io/spring-boot/docs/current/reference/html/application-properties.html)
-- [JWT.io](https://jwt.io/)
+- [Spring Boot Externalized Configuration](https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.external-config)
 - [Create React App Environment Variables](https://create-react-app.dev/docs/adding-custom-environment-variables/)
-- [MySQL Connection String](https://dev.mysql.com/doc/connector-j/en/connector-j-reference-jdbc-url-format.html)
+- [MySQL Connector/J URL format](https://dev.mysql.com/doc/connector-j/en/connector-j-reference-jdbc-url-format.html)
