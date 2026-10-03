@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: chat-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          # Build & push this from Backend/Dockerfile — see docs/K8S_DEPLOYMENT.md.
+          # Replace with your own registry/image before applying.
+          image: ghcr.io/YOUR_GITHUB_USERNAME/chat-app-backend:latest
+          ports:
+            - containerPort: 5454
+          envFrom:
+            - configMapRef:
+                name: chat-app-config
+          env:
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: chat-app-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: chat-app-secrets
+                  key: JWT_SECRET_KEY
+            - name: JWT_EXPIRATION_TIME
+              value: "86400000"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5454
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5454
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 384Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: chat-app
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 5454
+      targetPort: 5454

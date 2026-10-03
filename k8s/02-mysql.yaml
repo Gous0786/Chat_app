@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chat-app-config
+  namespace: chat-app
+data:
+  # Reach MySQL by its Service DNS name, not localhost — same idea as the
+  # docker-compose setup, just a k8s Service name instead of a compose service name.
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/whatsapp?allowPublicKeyRetrieval=true&useSSL=false"
+  SPRING_DATASOURCE_USERNAME: "root"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update" # switch to "validate" once the schema is stable
+  SPRING_JPA_SHOW_SQL: "false"
+  # Must match the Ingress host in 05-ingress.yaml (same origin for CORS + the
+  # WebSocket handshake). Update this when you set your real hostname.
+  FRONTEND_ORIGIN: "https://chat.example.local"
+
+---
+# PersistentVolumeClaim: k3s ships the "local-path" StorageClass by default and
+# marks it as the cluster default, so no storageClassName is needed here — it
+# provisions a directory on the node's disk automatically on first use.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data
+  namespace: chat-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# A single-replica Deployment (not a StatefulSet) is deliberate here: with one
+# replica, a PVC already gives MySQL stable storage across restarts, which is
+# the main thing being solved for. StatefulSet's extra guarantees — stable
+# per-pod network identity, ordered scale-up/down — matter once you're running
+# more than one replica of a stateful app, which a single MySQL instance isn't.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: chat-app
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # a rolling update would try to start a 2nd pod against the same PVC
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: chat-app-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              value: "whatsapp"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$(MYSQL_ROOT_PASSWORD)"]
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$(MYSQL_ROOT_PASSWORD)"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mysql-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: chat-app
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306

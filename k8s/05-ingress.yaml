@@ -1,0 +1,60 @@
+# Path-based routing under ONE hostname: the frontend and backend share an
+# origin, so the browser's fetch()/WebSocket calls are same-origin — no CORS
+# preflight, and FRONTEND_ORIGIN in the ConfigMap only has to match one value.
+#
+# k3s ships Traefik as its default ingress controller and watches standard
+# Ingress objects like this one directly — no Traefik-specific CRDs needed.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chat-app
+  namespace: chat-app
+  annotations:
+    # Uncomment once cert-manager + a ClusterIssuer are installed (see
+    # docs/K8S_DEPLOYMENT.md's TLS section):
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  rules:
+    - host: chat.example.local # replace with your real hostname
+      http:
+        paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 5454
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 5454
+          - path: /websocket
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 5454
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+  # TLS is required, not optional — see the note in docs/K8S_DEPLOYMENT.md
+  # about why the Signal-protocol encryption needs a secure context. Two ways
+  # to fill this in, both covered in that doc:
+  #   1. cert-manager + a real ACME issuer (Let's Encrypt) -> uncomment the
+  #      annotation above, this section auto-populates the named secret.
+  #   2. A self-signed / mkcert cert you create yourself:
+  #        kubectl create secret tls chat-app-tls --namespace chat-app \
+  #          --cert=fullchain.pem --key=privkey.pem
+  tls:
+    - hosts:
+        - chat.example.local
+      secretName: chat-app-tls

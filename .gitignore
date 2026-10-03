@@ -4,6 +4,9 @@
 */.env
 */.env.local
 
+# Filled-in Kubernetes secret (commit 01-secret.example.yaml instead)
+k8s/01-secret.yaml
+
 # OS / IDE
 .DS_Store
 Thumbs.db

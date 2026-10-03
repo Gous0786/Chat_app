@@ -22,7 +22,8 @@ HTTPS automatically or is called out where it doesn't.
 | A free demo/portfolio link, don't mind occasional cold starts | [Render](#option-1-render--vercel-free-demo) + Vercel |
 | A permanently free, always-on box you fully control | [Oracle Cloud Free Tier](#option-2-oracle-cloud-always-free-vm) |
 | The absolute least effort, small ongoing cost | [Railway](#option-3-railway-paid-easiest) |
-| To self-host on your own hardware | [Self-hosting](#option-4-self-hosting-your-own-machine) |
+| To self-host on your own hardware (Docker Compose) | [Self-hosting](#option-4-self-hosting-your-own-machine) |
+| To self-host **and** learn Kubernetes | [Kubernetes (k3s)](#option-5-kubernetes-k3s-on-your-own-hardware) |
 
 ---
 
@@ -110,6 +111,23 @@ the exact `docker-compose.yml` you already have.
    you a public HTTPS URL without opening ports on your router.
 5. If your ISP gives you a dynamic IP, pair this with a dynamic DNS service, or
    use one of the tunnel options above (they don't need a static IP at all).
+6. Set `FRONTEND_ORIGIN=https://your-domain.com` on the backend (see
+   [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md)) so CORS and the WebSocket
+   handshake accept requests from your real domain instead of the
+   `localhost:3000` default.
+
+## Option 5: Kubernetes (k3s) on your own hardware
+
+Same idea as Option 4, but orchestrated with Kubernetes instead of Docker
+Compose — more setup, but it's a genuinely valuable thing to learn, and this
+repo ships ready-to-apply manifests for it.
+
+**This gets its own full guide:** [docs/K8S_DEPLOYMENT.md](docs/K8S_DEPLOYMENT.md)
+(install k3s, build/push images, apply the manifests in [`k8s/`](k8s/), get
+TLS working). If you're using this project specifically to learn Kubernetes
+end-to-end (not just deploy it), see
+[docs/LEARNING_ROADMAP.md](docs/LEARNING_ROADMAP.md) for a staged path from
+"Linux box" to "cluster with observability and CI/CD."
 
 ---
 
@@ -128,8 +146,9 @@ the exact `docker-compose.yml` you already have.
 - [ ] `REACT_APP_API_BASE_URL` points at the real HTTPS backend URL
 - [ ] Database backups configured (`mysqldump` on a schedule, or your host's
       managed backup feature)
-- [ ] CORS origin in `AppConfig.java` matches your real frontend domain (it's
-      currently set for local development)
+- [ ] `FRONTEND_ORIGIN` set to your real frontend domain — it defaults to
+      `http://localhost:3000` and controls both CORS and the WebSocket
+      handshake's allowed origin (see [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md))
 
 ## Database Backup & Restore
 
@@ -143,9 +162,8 @@ docker exec -i chat_app-mysql-1 mysql -uroot -p<password> whatsapp < backup.sql
 
 ## Troubleshooting
 
-**CORS errors** — the backend's allowed origin is configured in
-`Backend/src/main/java/com/whatsapp/Web/config/AppConfig.java`; update it to
-match your deployed frontend URL.
+**CORS errors** — set `FRONTEND_ORIGIN` (backend env var) to match your
+deployed frontend URL exactly — see [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md).
 
 **WebSocket fails behind a reverse proxy** — make sure your proxy config
 upgrades `Connection`/`Upgrade` headers for the `/websocket` path (the Caddy
@@ -163,3 +181,5 @@ plain HTTP. Confirm the address bar shows `https://` (or you're on `localhost`).
 - [QUICK_START.md](QUICK_START.md) — local development setup
 - [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md) — every environment variable explained
 - [docs/ENCRYPTION.md](docs/ENCRYPTION.md) — why HTTPS matters for this app specifically
+- [docs/K8S_DEPLOYMENT.md](docs/K8S_DEPLOYMENT.md) — Kubernetes (k3s) deployment guide
+- [docs/LEARNING_ROADMAP.md](docs/LEARNING_ROADMAP.md) — staged Linux/Docker/K8s learning path

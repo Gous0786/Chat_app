@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: chat-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          # IMPORTANT: REACT_APP_API_BASE_URL is baked into this image at BUILD
+          # time (it's a Create React App env var, not a runtime one). Build it
+          # with --build-arg REACT_APP_API_BASE_URL matching the Ingress host
+          # in 05-ingress.yaml, e.g.:
+          #   docker build --build-arg REACT_APP_API_BASE_URL=https://chat.example.local \
+          #     -t ghcr.io/YOUR_GITHUB_USERNAME/chat-app-frontend:latest FrontEnd/client
+          # See docs/K8S_DEPLOYMENT.md for the full build/push workflow.
+          image: ghcr.io/YOUR_GITHUB_USERNAME/chat-app-frontend:latest
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: chat-app
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80

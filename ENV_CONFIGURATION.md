@@ -96,6 +96,15 @@ openssl rand -base64 32
 [Convert]::ToBase64String((1..32 | ForEach-Object {Get-Random -Maximum 256}))
 ```
 
+### CORS / WebSocket origin
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FRONTEND_ORIGIN` | `http://localhost:3000` | The single origin allowed to call the API (CORS) and open the WebSocket (STOMP handshake). Must exactly match the URL the frontend is actually served from — scheme included (`https://` vs `http://` matters). |
+
+Every deployment target that isn't `localhost:3000` needs this set — see
+[DEPLOYMENT.md](DEPLOYMENT.md) and [docs/K8S_DEPLOYMENT.md](docs/K8S_DEPLOYMENT.md).
+
 ---
 
 ## Frontend Environment Variables (`FrontEnd/client/.env.local`)
