@@ -1,0 +1,69 @@
+# Load-test stack: the app exactly as built, pinned to a small resource budget.
+#
+# The system under test (backend + mysql) gets hard CPU/memory caps so results
+# describe "what does this code do on a small box", not "on my laptop".
+# k6 runs in its own container with its own budget so the load generator does
+# not steal CPU from the app.
+#
+# Override the budget per run, e.g.:  BACKEND_CPUS=2 BACKEND_MEM=2g ./run.sh
+name: chatload
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: whatsapp
+    volumes:
+      - mysql_data:/var/lib/mysql
+    cpus: ${DB_CPUS:-1}
+    mem_limit: ${DB_MEM:-1g}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  backend:
+    build: ../Backend
+    # Exposed on a non-default port so it can't collide with a dev stack on 5454.
+    ports:
+      - "15454:5454"
+    environment:
+      SERVER_PORT: 5454
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/whatsapp?allowPublicKeyRetrieval=true&useSSL=false
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      # Left at the app's default (true) on purpose: the baseline measures the app as it ships.
+      SPRING_JPA_SHOW_SQL: ${SHOW_SQL:-true}
+      JWT_SECRET_KEY: loadtest-only-secret-not-for-production-0123456789
+      JWT_EXPIRATION_TIME: 86400000
+      FRONTEND_ORIGIN: http://localhost:3000
+    cpus: ${BACKEND_CPUS:-1}
+    mem_limit: ${BACKEND_MEM:-1g}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5454 && printf \"GET / HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q Welcome <&3'"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: ["tools"]
+    cpus: ${K6_CPUS:-2}
+    volumes:
+      - ./:/loadtest
+    working_dir: /loadtest
+    environment:
+      BASE_URL: http://backend:5454
+      WS_URL: ws://backend:5454
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

@@ -1,0 +1,1 @@
+{ "private": true, "type": "module", "description": "Load-test harness; k6 runs the scenarios, Node runs seed and report." }

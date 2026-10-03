@@ -1,0 +1,6 @@
+Hibernate: select u1_0.id,u1_0.email,u1_0.full_name,u1_0.password,u1_0.profile_picture from user u1_0 where u1_0.email=?
+2026-10-03T11:55:44.610Z  INFO 1 --- [MessageBroker-1] o.s.w.s.c.WebSocketMessageBrokerStats    : WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 48 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(48)-CONNECTED(48)-DISCONNECT(48)], stompBrokerRelay[null], inboundChannel[pool size = 2, active threads = 0, queued tasks = 0, completed tasks = 720], outboundChannel[pool size = 2, active threads = 0, queued tasks = 0, completed tasks = 192], sockJsScheduler[pool size = 1, active threads = 1, queued tasks = 1, completed tasks = 11]
+Exception in thread "http-nio-5454-Acceptor" java.lang.OutOfMemoryError: Java heap space
+
+Exception: java.lang.OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "http-nio-5454-Acceptor"
+Exception in thread "http-nio-5454-exec-58" Exception in thread "http-nio-5454-exec-37" Exception in thread "http-nio-5454-exec-27" java.lang.OutOfMemoryError: Java heap space
