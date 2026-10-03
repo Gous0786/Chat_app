@@ -12,3 +12,6 @@ k8s/01-secret.yaml
 Thumbs.db
 .idea/
 .vscode/
+
+# Local database backups (contain user data)
+backups/

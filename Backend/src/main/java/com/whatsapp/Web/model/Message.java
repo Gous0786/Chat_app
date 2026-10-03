@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Entity
 public class Message {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     // TEXT so it can hold base64 Signal ciphertext (far longer than 255 chars).
